@@ -1,0 +1,1268 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom"><title>plog</title><link href="http://plog.logston.me/" rel="alternate"></link><link href="http://plog.logston.me/feeds/misc.atom.xml" rel="self"></link><id>http://plog.logston.me/</id><updated>2016-05-15T20:00:00+00:00</updated><entry><title>Does multiprocessing copy sys.modules?</title><link href="http://plog.logston.me/does-multiprocessing-copy-sysmodules.html" rel="alternate"></link><updated>2016-05-15T20:00:00+00:00</updated><author><name>Paul Logston</name></author><id>tag:plog.logston.me,2016-05-15:does-multiprocessing-copy-sysmodules.html</id><summary type="html">&lt;p&gt;I wanted to know if the &lt;cite&gt;multiprocessing&lt;/cite&gt; library in Python copies the
+&lt;cite&gt;sys.modules&lt;/cite&gt; &lt;cite&gt;dict&lt;/cite&gt;.&lt;/p&gt;
+&lt;pre class="code python literal-block"&gt;
+&lt;span class="kn"&gt;from&lt;/span&gt; &lt;span class="nn"&gt;multiprocessing&lt;/span&gt; &lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="n"&gt;Pool&lt;/span&gt;
+&lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="nn"&gt;os&lt;/span&gt;
+&lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="nn"&gt;sys&lt;/span&gt;
+
+&lt;span class="k"&gt;def&lt;/span&gt; &lt;span class="nf"&gt;f&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;_x&lt;/span&gt;&lt;span class="p"&gt;):&lt;/span&gt;
+    &lt;span class="n"&gt;pid&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;os&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;getpid&lt;/span&gt;&lt;span class="p"&gt;()&lt;/span&gt;
+    &lt;span class="k"&gt;print&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;pid&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="nb"&gt;id&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;sys&lt;/span&gt;&lt;span class="p"&gt;))&lt;/span&gt;
+
+&lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="n"&gt;__name__&lt;/span&gt; &lt;span class="o"&gt;==&lt;/span&gt; &lt;span class="s1"&gt;'__main__'&lt;/span&gt;&lt;span class="p"&gt;:&lt;/span&gt;
+    &lt;span class="k"&gt;with&lt;/span&gt; &lt;span class="n"&gt;Pool&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="mi"&gt;5&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="k"&gt;as&lt;/span&gt; &lt;span class="n"&gt;p&lt;/span&gt;&lt;span class="p"&gt;:&lt;/span&gt;
+        &lt;span class="n"&gt;p&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;map&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;f&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mi"&gt;2&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mi"&gt;3&lt;/span&gt;&lt;span class="p"&gt;])&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="literal-block"&gt;
+➜  ~ python multi.py
+73924 4458196488
+73925 4458196488
+73926 4458196488
+&lt;/pre&gt;
+&lt;p&gt;Looks like the location of the &lt;cite&gt;sys&lt;/cite&gt; package is at the same location in memory
+for each process. I wonder if we have to grab an actual module in &lt;cite&gt;sys.modules&lt;/cite&gt;
+to see a change in location ...&lt;/p&gt;
+&lt;pre class="code python literal-block"&gt;
+&lt;span class="kn"&gt;from&lt;/span&gt; &lt;span class="nn"&gt;multiprocessing&lt;/span&gt; &lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="n"&gt;Pool&lt;/span&gt;
+&lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="nn"&gt;os&lt;/span&gt;
+&lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="nn"&gt;sys&lt;/span&gt;
+
+&lt;span class="k"&gt;def&lt;/span&gt; &lt;span class="nf"&gt;f&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;_x&lt;/span&gt;&lt;span class="p"&gt;):&lt;/span&gt;
+    &lt;span class="n"&gt;pid&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;os&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;getpid&lt;/span&gt;&lt;span class="p"&gt;()&lt;/span&gt;
+    &lt;span class="k"&gt;print&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;pid&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="nb"&gt;id&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;sys&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;modules&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;'os'&lt;/span&gt;&lt;span class="p"&gt;]))&lt;/span&gt;
+
+&lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="n"&gt;__name__&lt;/span&gt; &lt;span class="o"&gt;==&lt;/span&gt; &lt;span class="s1"&gt;'__main__'&lt;/span&gt;&lt;span class="p"&gt;:&lt;/span&gt;
+    &lt;span class="k"&gt;with&lt;/span&gt; &lt;span class="n"&gt;Pool&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="mi"&gt;5&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="k"&gt;as&lt;/span&gt; &lt;span class="n"&gt;p&lt;/span&gt;&lt;span class="p"&gt;:&lt;/span&gt;
+        &lt;span class="n"&gt;p&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;map&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;f&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mi"&gt;2&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mi"&gt;3&lt;/span&gt;&lt;span class="p"&gt;])&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="literal-block"&gt;
+➜  ~ python multi.py
+74407 4366832248
+74408 4366832248
+74409 4366832248
+&lt;/pre&gt;
+&lt;p&gt;Nope. No change. I wonder if there is some magic going on an all python
+processes of a certain flavor share memory for the core packages in
+&lt;cite&gt;sys.modules&lt;/cite&gt;? Let's try importing something that is not automatically
+populated in &lt;cite&gt;sys.modules&lt;/cite&gt; on startup ...&lt;/p&gt;
+&lt;pre class="code python literal-block"&gt;
+&lt;span class="kn"&gt;from&lt;/span&gt; &lt;span class="nn"&gt;multiprocessing&lt;/span&gt; &lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="n"&gt;Pool&lt;/span&gt;
+&lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="nn"&gt;os&lt;/span&gt;
+&lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="nn"&gt;sys&lt;/span&gt;
+&lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="nn"&gt;statistics&lt;/span&gt;
+
+&lt;span class="k"&gt;def&lt;/span&gt; &lt;span class="nf"&gt;f&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;_x&lt;/span&gt;&lt;span class="p"&gt;):&lt;/span&gt;
+    &lt;span class="n"&gt;pid&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;os&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;getpid&lt;/span&gt;&lt;span class="p"&gt;()&lt;/span&gt;
+    &lt;span class="k"&gt;print&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;pid&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="nb"&gt;id&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;sys&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;modules&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;'statistics'&lt;/span&gt;&lt;span class="p"&gt;]))&lt;/span&gt;
+
+&lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="n"&gt;__name__&lt;/span&gt; &lt;span class="o"&gt;==&lt;/span&gt; &lt;span class="s1"&gt;'__main__'&lt;/span&gt;&lt;span class="p"&gt;:&lt;/span&gt;
+    &lt;span class="k"&gt;with&lt;/span&gt; &lt;span class="n"&gt;Pool&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="mi"&gt;5&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="k"&gt;as&lt;/span&gt; &lt;span class="n"&gt;p&lt;/span&gt;&lt;span class="p"&gt;:&lt;/span&gt;
+        &lt;span class="n"&gt;p&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;map&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;f&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mi"&gt;2&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mi"&gt;3&lt;/span&gt;&lt;span class="p"&gt;])&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="literal-block"&gt;
+➜  ~ python multi.py
+74550 4465539176
+74551 4465539176
+74552 4465539176
+&lt;/pre&gt;
+&lt;p&gt;Nope. &lt;cite&gt;sys.modules['statistics']&lt;/cite&gt; shares the same location in memory too.
+Is that because we imported it in the first python process? If we were
+to import &lt;cite&gt;statistics&lt;/cite&gt; in a &amp;quot;pooled&amp;quot; python process, would we get a different
+location in memory?&lt;/p&gt;
+&lt;pre class="code python literal-block"&gt;
+&lt;span class="kn"&gt;from&lt;/span&gt; &lt;span class="nn"&gt;multiprocessing&lt;/span&gt; &lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="n"&gt;Pool&lt;/span&gt;
+&lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="nn"&gt;os&lt;/span&gt;
+&lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="nn"&gt;sys&lt;/span&gt;
+
+&lt;span class="k"&gt;def&lt;/span&gt; &lt;span class="nf"&gt;f&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;_x&lt;/span&gt;&lt;span class="p"&gt;):&lt;/span&gt;
+    &lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="nn"&gt;statistics&lt;/span&gt;
+    &lt;span class="n"&gt;pid&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;os&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;getpid&lt;/span&gt;&lt;span class="p"&gt;()&lt;/span&gt;
+    &lt;span class="k"&gt;print&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;pid&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="nb"&gt;id&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;sys&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;modules&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;'statistics'&lt;/span&gt;&lt;span class="p"&gt;]))&lt;/span&gt;
+
+&lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="n"&gt;__name__&lt;/span&gt; &lt;span class="o"&gt;==&lt;/span&gt; &lt;span class="s1"&gt;'__main__'&lt;/span&gt;&lt;span class="p"&gt;:&lt;/span&gt;
+    &lt;span class="k"&gt;with&lt;/span&gt; &lt;span class="n"&gt;Pool&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="mi"&gt;5&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="k"&gt;as&lt;/span&gt; &lt;span class="n"&gt;p&lt;/span&gt;&lt;span class="p"&gt;:&lt;/span&gt;
+        &lt;span class="n"&gt;p&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;map&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;f&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mi"&gt;2&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mi"&gt;3&lt;/span&gt;&lt;span class="p"&gt;])&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="literal-block"&gt;
+➜  ~ python multi.py
+74625 4526424936
+74624 4526424776
+74626 4526425096
+&lt;/pre&gt;
+&lt;p&gt;Yes! Look at that! So a pool of Python processes share their &amp;quot;parent's&amp;quot; memory
+until something needs to be added to that process's memory. Then, I assume that
+the children ask for more personalized memory to contain new imports.
+Now I wonder, can I force a change in the location of memory of a package
+that one one of the pooled processes inherited?&lt;/p&gt;
+&lt;pre class="code python literal-block"&gt;
+&lt;span class="kn"&gt;from&lt;/span&gt; &lt;span class="nn"&gt;multiprocessing&lt;/span&gt; &lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="n"&gt;Pool&lt;/span&gt;
+&lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="nn"&gt;os&lt;/span&gt;
+&lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="nn"&gt;sys&lt;/span&gt;
+&lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="nn"&gt;statistics&lt;/span&gt;
+
+&lt;span class="k"&gt;def&lt;/span&gt; &lt;span class="nf"&gt;f&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;_x&lt;/span&gt;&lt;span class="p"&gt;):&lt;/span&gt;
+    &lt;span class="n"&gt;pid&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;os&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;getpid&lt;/span&gt;&lt;span class="p"&gt;()&lt;/span&gt;
+    &lt;span class="n"&gt;sys&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;modules&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;'statistics'&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="mi"&gt;12345678902345678&lt;/span&gt;
+    &lt;span class="k"&gt;print&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;pid&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="nb"&gt;id&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;sys&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;modules&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;'statistics'&lt;/span&gt;&lt;span class="p"&gt;]))&lt;/span&gt;
+
+&lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="n"&gt;__name__&lt;/span&gt; &lt;span class="o"&gt;==&lt;/span&gt; &lt;span class="s1"&gt;'__main__'&lt;/span&gt;&lt;span class="p"&gt;:&lt;/span&gt;
+    &lt;span class="k"&gt;with&lt;/span&gt; &lt;span class="n"&gt;Pool&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="mi"&gt;5&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="k"&gt;as&lt;/span&gt; &lt;span class="n"&gt;p&lt;/span&gt;&lt;span class="p"&gt;:&lt;/span&gt;
+        &lt;span class="n"&gt;p&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;map&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;f&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mi"&gt;2&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mi"&gt;3&lt;/span&gt;&lt;span class="p"&gt;])&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="literal-block"&gt;
+➜  ~ python multi.py
+75027 4388645936
+75028 4388645936
+75029 4388645936
+&lt;/pre&gt;
+&lt;p&gt;Well, that didn't do it. But maybe it did. Maybe the
+&lt;cite&gt;sys.modules['statistics']&lt;/cite&gt; was changed for each pooled process equally?
+Maybe if we used a different number for each process, we'd get different
+locations in memory for &lt;cite&gt;sys.modules['statistics']&lt;/cite&gt;. Let's see ...&lt;/p&gt;
+&lt;pre class="code python literal-block"&gt;
+&lt;span class="kn"&gt;from&lt;/span&gt; &lt;span class="nn"&gt;multiprocessing&lt;/span&gt; &lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="n"&gt;Pool&lt;/span&gt;
+&lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="nn"&gt;os&lt;/span&gt;
+&lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="nn"&gt;sys&lt;/span&gt;
+&lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="nn"&gt;statistics&lt;/span&gt;
+
+&lt;span class="k"&gt;def&lt;/span&gt; &lt;span class="nf"&gt;f&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;x&lt;/span&gt;&lt;span class="p"&gt;):&lt;/span&gt;
+    &lt;span class="n"&gt;pid&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;os&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;getpid&lt;/span&gt;&lt;span class="p"&gt;()&lt;/span&gt;
+    &lt;span class="n"&gt;n&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="mi"&gt;1234&lt;/span&gt; &lt;span class="o"&gt;**&lt;/span&gt; &lt;span class="n"&gt;x&lt;/span&gt;
+    &lt;span class="n"&gt;sys&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;modules&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;'statistics'&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;n&lt;/span&gt;
+    &lt;span class="k"&gt;print&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;pid&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="nb"&gt;id&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;sys&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;modules&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;'statistics'&lt;/span&gt;&lt;span class="p"&gt;]))&lt;/span&gt;
+
+&lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="n"&gt;__name__&lt;/span&gt; &lt;span class="o"&gt;==&lt;/span&gt; &lt;span class="s1"&gt;'__main__'&lt;/span&gt;&lt;span class="p"&gt;:&lt;/span&gt;
+    &lt;span class="k"&gt;with&lt;/span&gt; &lt;span class="n"&gt;Pool&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="mi"&gt;5&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="k"&gt;as&lt;/span&gt; &lt;span class="n"&gt;p&lt;/span&gt;&lt;span class="p"&gt;:&lt;/span&gt;
+        &lt;span class="n"&gt;p&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;map&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;f&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mi"&gt;2&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mi"&gt;3&lt;/span&gt;&lt;span class="p"&gt;])&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="literal-block"&gt;
+➜  ~ python multi.py
+75507 4388120016
+75508 4388120144
+75509 4388120080
+&lt;/pre&gt;
+&lt;p&gt;Yup. Looks like copy on write. &lt;a class="reference external" href="https://en.wikipedia.org/wiki/Copy-on-write"&gt;https://en.wikipedia.org/wiki/Copy-on-write&lt;/a&gt;&lt;/p&gt;
+</summary></entry><entry><title>Cardboard Air Conditioner Insulator</title><link href="http://plog.logston.me/cardboard-air-conditioner-insulator.html" rel="alternate"></link><updated>2016-01-05T06:28:04+00:00</updated><author><name>Paul Logston</name></author><id>tag:plog.logston.me,2016-01-05:cardboard-air-conditioner-insulator.html</id><summary type="html">&lt;img alt="" src="../legacy/2016-01-05-Cardboard-AC-Insulator/IMG_0018-1.jpg" style="width: 800px;" /&gt;
+&lt;div class="section" id="motivation"&gt;
+&lt;h2&gt;Motivation&lt;/h2&gt;
+&lt;p&gt;I love air conditioning. My father owned his own sheet metal &amp;amp; HVAC
+construction company and I've always thought refrigeration was quite cool.
+I also &lt;em&gt;need&lt;/em&gt; an A/C while living in NYC in the summer. I can not sleep
+without an A/C going most nights between May and October. But I really don't
+like taking the A/C out of the window and storing it over the winter.&lt;/p&gt;
+&lt;p&gt;Enter the cardboard box. I cut several pieces of cardboard to size so that
+the end product would fit snuggly in my window frame and cover my A/C. I
+wanted to see if it would sufficiently block the cold from coming in.
+Here's my research.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="section" id="methods"&gt;
+&lt;h2&gt;Methods&lt;/h2&gt;
+&lt;p&gt;I connected an Arduino to three temperature sensors (DS18B20) via phone wire.
+I placed one sensor outside of my home, one between the AC and the
+cardboard insulator, and one in front of the cardboard insulator.&lt;/p&gt;
+&lt;img alt="" src="../legacy/2016-01-05-Cardboard-AC-Insulator/IMG_0015-1.jpg" style="width: 800px;" /&gt;
+&lt;img alt="" src="../legacy/2016-01-05-Cardboard-AC-Insulator/IMG_0016-1.jpg" style="width: 800px;" /&gt;
+&lt;img alt="" src="../legacy/2016-01-05-Cardboard-AC-Insulator/IMG_0020-1.jpg" style="width: 800px;" /&gt;
+&lt;p&gt;The Arduino was run from approximately Nov 1st, 2015 to
+approximately Jan 1st, 2016.&lt;/p&gt;
+&lt;p&gt;The software loaded onto the Arduino can be downloaded from this
+&lt;a class="reference external" href="../legacy/2016-01-05-Cardboard-AC-Insulator/gather.cpp"&gt;link&lt;/a&gt;.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="section" id="analysis-and-results"&gt;
+&lt;h2&gt;Analysis and Results&lt;/h2&gt;
+&lt;p&gt;The script that was used to analyze the data pulled from the Arduino can be
+downloaded &lt;a class="reference external" href="../legacy/2016-01-05-Cardboard-AC-Insulator/visualize.py"&gt;here&lt;/a&gt;.
+This python script produced the image and two tables worth of data below.&lt;/p&gt;
+&lt;p&gt;The data can be downloaded
+&lt;a class="reference external" href="../legacy/2016-01-05-Cardboard-AC-Insulator/TEMPS.TXT"&gt;too&lt;/a&gt;.&lt;/p&gt;
+&lt;img alt="" src="../legacy/2016-01-05-Cardboard-AC-Insulator/results.png" style="width: 800px;" /&gt;
+&lt;table border="1" class="docutils"&gt;
+&lt;colgroup&gt;
+&lt;col width="51%" /&gt;
+&lt;col width="23%" /&gt;
+&lt;col width="26%" /&gt;
+&lt;/colgroup&gt;
+&lt;tbody valign="top"&gt;
+&lt;tr&gt;&lt;td&gt;Sensor ID&lt;/td&gt;
+&lt;td&gt;Mean&lt;/td&gt;
+&lt;td&gt;Std Dev&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;28CA1F5707000079&lt;/td&gt;
+&lt;td&gt;12.43&lt;/td&gt;
+&lt;td&gt;4.88&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;285F3AFE040000D7&lt;/td&gt;
+&lt;td&gt;14.19&lt;/td&gt;
+&lt;td&gt;4.80&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;28307DFD04000000&lt;/td&gt;
+&lt;td&gt;20.72&lt;/td&gt;
+&lt;td&gt;1.23&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;table border="1" class="docutils"&gt;
+&lt;colgroup&gt;
+&lt;col width="22%" /&gt;
+&lt;col width="19%" /&gt;
+&lt;col width="29%" /&gt;
+&lt;col width="29%" /&gt;
+&lt;/colgroup&gt;
+&lt;tbody valign="top"&gt;
+&lt;tr&gt;&lt;td&gt;Comparison&lt;/td&gt;
+&lt;td&gt;t-Statistic&lt;/td&gt;
+&lt;td&gt;Two-Tailed p-Value&lt;/td&gt;
+&lt;td&gt;Average Difference&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;--79 v. --D7&lt;/td&gt;
+&lt;td&gt;262.15&lt;/td&gt;
+&lt;td&gt;0.0&lt;/td&gt;
+&lt;td&gt;1.77&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;--D7 v. --00&lt;/td&gt;
+&lt;td&gt;1337.87&lt;/td&gt;
+&lt;td&gt;0.0&lt;/td&gt;
+&lt;td&gt;6.53&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Welch's t-test was used to compute the t-statistic.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="section" id="discussion"&gt;
+&lt;h2&gt;Discussion&lt;/h2&gt;
+&lt;p&gt;Welp... it's clear to me that this cardboard box does keep the
+apartment warmer than if I was to leave A/C in the window and forgo
+the insulator. The there is a clear difference in means between the sensor
+between the A/C and the cardboard insulator (285F3AFE040000D7) and the
+sensor in the apartment (28307DFD04000000). &lt;strong&gt;This box keeps my place warmer
+by six degrees Celsius on average.&lt;/strong&gt;&lt;/p&gt;
+&lt;/div&gt;
+</summary></entry><entry><title>Cow Heart (Explicit Content)</title><link href="http://plog.logston.me/cow-heart-explicit-content.html" rel="alternate"></link><updated>2015-09-07T23:45:00+00:00</updated><author><name>Paul Logston</name></author><id>tag:plog.logston.me,2015-09-07:cow-heart-explicit-content.html</id><summary type="html">&lt;p&gt;--&lt;/p&gt;
+&lt;div class="section" id="motivation"&gt;
+&lt;h2&gt;Motivation&lt;/h2&gt;
+&lt;p&gt;Did you know you can buy hearts at the grocerry store? I didn't. I walked into
+associated on 133rd and Lenox and saw a beef heart sitting amounts the other
+meats. My initial reaction was &amp;quot;What? Heart?&amp;quot;. My secondary reaction was
+&amp;quot;Yeah, I'm buying this&amp;quot;.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;WARNING&lt;/strong&gt;: I'm going to show pictures of beef heart.&lt;/p&gt;
+&lt;img alt="" src="/legacy/2015-09-07-Cow-Heart/wrapped.jpg" /&gt;
+&lt;p&gt;I wasn't sure what I was going to do with it, other than look at the muscle
+tissue and hopefully some chambers. However after a few milliseconds,
+I decided to dissect it, old school style.&lt;/p&gt;
+&lt;p&gt;My friend Derek got in on the fun and we found some lab like instructions on
+the web for dissecting a cow heart. With a cookie sheet and some box knifes,
+we got started.&lt;/p&gt;
+&lt;img alt="" src="/legacy/2015-09-07-Cow-Heart/starting.jpg" /&gt;
+&lt;p&gt;When we first started looking at the heart, we noticed what we thought
+were chordae tendineae. Since we didn't have a high school anatomy teacher
+with us to confirm our findings, we had to go on gut.&lt;/p&gt;
+&lt;img alt="" src="/legacy/2015-09-07-Cow-Heart/hands-off-heart.jpg" /&gt;
+&lt;img alt="" src="/legacy/2015-09-07-Cow-Heart/chordae-tendineae.jpg" /&gt;
+&lt;p&gt;What I also found interesting was how deep the chambers seemed to go.
+The chamber size really gave you a since for the size of the animal.
+On the other hand though, oddly enough, some of the blood vessels
+seemed extraordinarily small; blood vessels that seemed to match up
+(location-wise) with major arteries of the heart from our lab handout.&lt;/p&gt;
+&lt;img alt="" src="/legacy/2015-09-07-Cow-Heart/thumbing.jpg" /&gt;
+&lt;p&gt;After chatting a bit, Derek and I came to the conclusion that part of
+the heart was missing. We think that, at the place were they cut out the
+cow hearts, they cut off the not-so-muscular parts of the heart because
+that doesn't get eaten. So what we were left with was most of the left
+ventricle, a bit of the right ventricle, and hardly no atria.&lt;/p&gt;
+&lt;img alt="" src="/legacy/2015-09-07-Cow-Heart/open-heart.jpg" /&gt;
+&lt;/div&gt;
+&lt;div class="section" id="lessons-learned"&gt;
+&lt;h2&gt;Lessons Learned&lt;/h2&gt;
+&lt;ul class="simple"&gt;
+&lt;li&gt;You can buy cow heart at the grocery store.&lt;/li&gt;
+&lt;li&gt;Grocery store hearts are cut for consumption.&lt;/li&gt;
+&lt;li&gt;Hearts are pretty cool to look at.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;div class="section" id="thanks"&gt;
+&lt;h3&gt;Thanks&lt;/h3&gt;
+&lt;ul class="simple"&gt;
+&lt;li&gt;To Gina for picking up a camera and taking pictures.&lt;/li&gt;
+&lt;li&gt;To the cow whose heart we dissected.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+</summary></entry><entry><title>Snakes and Ladders</title><link href="http://plog.logston.me/snakes-and-ladders.html" rel="alternate"></link><updated>2015-09-07T21:45:00+00:00</updated><author><name>Paul Logston</name></author><id>tag:plog.logston.me,2015-09-07:snakes-and-ladders.html</id><summary type="html">&lt;div class="section" id="motivation"&gt;
+&lt;h2&gt;Motivation&lt;/h2&gt;
+&lt;p&gt;I was visiting my friends Urbi and Derek over last winter and we decided to
+pull out a game. Urbi pulled out a 1000-piece puzzle of Baton Rouge,
+a slightly loved deck of cards, I think Life (the game of, that is),
+and Snakes and Ladders.&lt;/p&gt;
+&lt;img alt="" src="/legacy/2014-12-04_Snakes_and_Ladders/snakes_and_ladders.JPG" /&gt;
+&lt;p&gt;Derek immediately groaned at the idea of Snakes and Ladders. I, having not seen
+this game (or its equivalent Shoots and Ladders) since grade school, was too
+nostalgic to say no to the game that Urbi was pushing.&lt;/p&gt;
+&lt;p&gt;After a solid look at the board and the die though, I realized where Derek
+was coming from. This was a non-game game. There was no strategy to this game,
+only the physical labor of rolling a die. Still swept up by a bit of memories,
+I rolled on with Urbi. I have to say, it felt good to hit those ladders and it
+pinched to slide down those snakes. In a game of absolute chance, where I
+couldn't control anything but when I stopped exerting enough force to keep a
+die in my hand, I was fully invested. After the 17th role however, I got a bit
+bored. Me and Derek started to talk about the rules of the game I realized
+that playing with anyone in a given sitting is like playing your self in two
+sequential sittings; since this is a game of complete chance, who plays has
+no effect on the out come of the game for that player. Once I realized that
+humans were not necessary for this game, I decided to program it.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="section" id="methods"&gt;
+&lt;h2&gt;Methods&lt;/h2&gt;
+&lt;p&gt;I chose Go to build out this game because:&lt;/p&gt;
+&lt;ol class="arabic simple"&gt;
+&lt;li&gt;I wanted to try Go. My other option was Python but I knew Python.
+Always be learning and growing.&lt;/li&gt;
+&lt;li&gt;I wanted to &lt;a class="reference external" href="https://en.wikipedia.org/wiki/Monte_Carlo_method"&gt;Monte Carlo&lt;/a&gt;
+this game to see what the spread &lt;a class="footnote-reference" href="#id2" id="id1"&gt;[1]&lt;/a&gt; is like and I figured I could get a lot of
+data fast if I had a lot of workers playing the game in parallel; I heard Go
+was good for concurrency.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;The code I wrote:&lt;/p&gt;
+&lt;pre class="code ipynb-cell literal-block"&gt;
+package main
+
+import (
+  &amp;quot;fmt&amp;quot;
+  &amp;quot;math/rand&amp;quot;
+  &amp;quot;sync&amp;quot;
+)
+
+const NUMBER_OF_GAMES int = 1000000000
+
+var wg sync.WaitGroup
+var jumps = map[int]int{
+    100: 0,    99: 0,    98: 0,    97: 0,    96: 81,   95: 0,    94: 11,   93: 0,    92: 0,    91: 70,
+     81: 0,    82: 0,    83: 43,   84: 0,    85: 0,    86: 93,   87: 0,    88: 0,    89: 56,   90: 0,
+     80: 0,    79: 0,    78: 0,    77: 0,    76: 0,    75: 0,    74: 0,    73: 0,    72: 90,   71: 0,
+     61: 0,    62: 0,    63: 82,   64: 0,    65: 0,    66: 0,    67: 0,    68: 36,   69: 0,    70: 0,
+     60: 21,   59: 0,    58: 0,    57: 0,    56: 0,    55: 0,    54: 0,    53: 0,    52: 0,    51: 0,
+     41: 0,    42: 77,   43: 0,    44: 15,   45: 0,    46: 0,    47: 0,    48: 0,    49: 0,    50: 0,
+     40: 62,   39: 0,    38: 0,    37: 0,    36: 0,    35: 0,    34: 0,    33: 9,    32: 0,    31: 85,
+     21: 0,    22: 0,    23: 5,    24: 0,    25: 0,    26: 0,    27: 0,    28: 0,    29: 0,    30: 0,
+     20: 55,   19: 0,    18: 0,    17: 0,    16: 0,    15: 0,    14: 0,    13: 0,    12: 0,    11: 0,
+      1: 0,     2: 0,     3: 0,     4: 35,    5: 0,     6: 0,     7: 0,     8: 47,    9: 0,    10: 0,
+}
+
+func playgame() {
+  var pos, moves int = 1, 0
+  for pos &amp;lt; 100 {
+    pos += rand.Intn(5) + 1
+    if jumps[pos] &amp;gt; 0 {
+      pos = jumps[pos]
+    }
+    moves += 1
+  }
+  defer wg.Done()
+  fmt.Println(moves)
+}
+
+func main() {
+  wg.Add(NUMBER_OF_GAMES)
+  for i := 0; i &amp;lt; NUMBER_OF_GAMES; i++ {
+    go playgame()
+  }
+  wg.Wait()
+}
+&lt;/pre&gt;
+&lt;p&gt;The program simply plays the game and counts how many die rolls it took to reach
+one hundred. If the program noticed that a die roll landed the computerized game
+player on a snake or ladder, appropriate actions were taken to reset the position
+of the game player.&lt;/p&gt;
+&lt;p&gt;Now, the meticulous reader will notice that my original script (this one above)
+was designed to play one billion games. My laptop did not agree.&lt;/p&gt;
+&lt;img alt="" src="/legacy/2014-12-04_Snakes_and_Ladders/one-billion-60gb.png" /&gt;
+&lt;p&gt;After letting the program consume a little over 60 GB, my laptop killed
+the process. First lesson about Go, Go does not give my laptop the ability
+to create and run 1 billion goroutines. It's important to learn you limits
+while you're young.&lt;/p&gt;
+&lt;p&gt;After fiddling with the number of goroutines, I settled (got the program to run)
+with 16.25 million goroutines.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="section" id="analysis-and-results"&gt;
+&lt;h2&gt;Analysis and Results&lt;/h2&gt;
+&lt;p&gt;Importing my 16.25 million data points into an IPython notebook,
+I was able to generate the following histogram.&lt;/p&gt;
+&lt;pre class="code python ipynb-cell literal-block"&gt;
+&lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="nn"&gt;matplotlib.pyplot&lt;/span&gt; &lt;span class="kn"&gt;as&lt;/span&gt; &lt;span class="nn"&gt;plt&lt;/span&gt;
+&lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="nn"&gt;numpy&lt;/span&gt; &lt;span class="kn"&gt;as&lt;/span&gt; &lt;span class="nn"&gt;np&lt;/span&gt;
+&lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="nn"&gt;pandas&lt;/span&gt; &lt;span class="kn"&gt;as&lt;/span&gt; &lt;span class="nn"&gt;pd&lt;/span&gt;
+
+&lt;span class="n"&gt;pd&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;set_option&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;'display.mpl_style'&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="s1"&gt;'default'&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;  &lt;span class="c1"&gt;# give plots a more pleasing visual style&lt;/span&gt;
+
+&lt;span class="o"&gt;%&lt;/span&gt;&lt;span class="n"&gt;matplotlib&lt;/span&gt; &lt;span class="n"&gt;inline&lt;/span&gt;
+
+&lt;span class="n"&gt;array&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;np&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;genfromtxt&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;'game_data.txt'&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+
+&lt;span class="n"&gt;_&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;axes&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;plt&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;subplots&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;figsize&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="mi"&gt;16&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;&lt;span class="mi"&gt;10&lt;/span&gt;&lt;span class="p"&gt;))&lt;/span&gt;
+&lt;span class="n"&gt;axes&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;set_xlabel&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;'Die rolls'&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;axes&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;set_ylabel&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;'Number of times game was completed in X number of die rolls'&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;plt&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;hist&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;array&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;bins&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="mi"&gt;100&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;/pre&gt;
+&lt;img alt="" src="/legacy/2014-12-04_Snakes_and_Ladders/die-roll-hist.png" /&gt;
+&lt;p&gt;Further number crunching yields the following numbers:&lt;/p&gt;
+&lt;table border="1" class="docutils"&gt;
+&lt;colgroup&gt;
+&lt;col width="44%" /&gt;
+&lt;col width="56%" /&gt;
+&lt;/colgroup&gt;
+&lt;thead valign="bottom"&gt;
+&lt;tr&gt;&lt;th class="head" colspan="2"&gt;basic stats&lt;/th&gt;
+&lt;/tr&gt;
+&lt;tr&gt;&lt;th class="head"&gt;stat&lt;/th&gt;
+&lt;th class="head"&gt;value&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody valign="top"&gt;
+&lt;tr&gt;&lt;td&gt;min&lt;/td&gt;
+&lt;td&gt;6&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;max&lt;/td&gt;
+&lt;td&gt;704&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;mean&lt;/td&gt;
+&lt;td&gt;53&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;mode&lt;/td&gt;
+&lt;td&gt;14&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;/div&gt;
+&lt;div class="section" id="discussion"&gt;
+&lt;h2&gt;Discussion&lt;/h2&gt;
+&lt;p&gt;Some poor virtual soul had to role the die 704 times before they got to 100.
+That's one heck of a snake-ladder loop. Of course if this player was flesh and
+blood, they would have stopped when someone else won. And on average (using mode
+as the average since this histogram is so skewed toward the right), players tend
+to finish in about 14 rolls and one was able to finish in just 6 rolls!&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="section" id="conclusion"&gt;
+&lt;h2&gt;Conclusion&lt;/h2&gt;
+&lt;p&gt;Given that goroutines require some state, you can not run one billion of them
+on a MacBook. If you are playing snakes and ladders and you've just passed your
+14th turn (and your not finished) you're on the loosing side of the histogram.&lt;/p&gt;
+&lt;p&gt;I don't have plans to update my Go code to figure out what loops players are or
+are not ending up in but I'm very interested in hearing if anyone else discovers
+these pieces of info.&lt;/p&gt;
+&lt;p&gt;Lastly, I'm very open to hearing critiques about my Go code. I'm still learning
+and when I'm learning I like to hear opinions. Feel free.&lt;/p&gt;
+&lt;div class="section" id="footnotes"&gt;
+&lt;h3&gt;Footnotes&lt;/h3&gt;
+&lt;table class="docutils footnote" frame="void" id="id2" rules="none"&gt;
+&lt;colgroup&gt;&lt;col class="label" /&gt;&lt;col /&gt;&lt;/colgroup&gt;
+&lt;tbody valign="top"&gt;
+&lt;tr&gt;&lt;td class="label"&gt;&lt;a class="fn-backref" href="#id1"&gt;[1]&lt;/a&gt;&lt;/td&gt;&lt;td&gt;Spread = Distribution of number of roles required to complete game.&lt;/td&gt;&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+</summary></entry><entry><title>Commit Tagging vs. Time</title><link href="http://plog.logston.me/commit-tagging-vs-time.html" rel="alternate"></link><updated>2015-05-25T13:45:00+00:00</updated><author><name>Paul Logston</name></author><id>tag:plog.logston.me,2015-05-25:commit-tagging-vs-time.html</id><summary type="html">&lt;div class="section" id="introduction"&gt;
+&lt;h2&gt;Introduction&lt;/h2&gt;
+&lt;p&gt;I've released a number of Python packages over the past few months and I've
+been curious about how I should version them. I decided to write a new
+package &lt;a class="reference external" href="https://pypi.python.org/pypi/plottags"&gt;plottags&lt;/a&gt; that I could use to plot the tag history for a repository
+with respect to time. Here are a few of the plots I've created with
+&lt;a class="reference external" href="https://pypi.python.org/pypi/plottags"&gt;plottags&lt;/a&gt;.&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img alt="" src="/legacy/2015-05-25-Time-Tag/cpython.png" style="width: 800px;" /&gt;
+&lt;p class="caption"&gt;Tagging History for CPython&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="figure"&gt;
+&lt;img alt="" src="/legacy/2015-05-25-Time-Tag/ansible.png" style="width: 800px;" /&gt;
+&lt;p class="caption"&gt;Tagging History for Ansible&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="figure"&gt;
+&lt;img alt="" src="/legacy/2015-05-25-Time-Tag/django.png" style="width: 800px;" /&gt;
+&lt;p class="caption"&gt;Tagging History for Django&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="figure"&gt;
+&lt;img alt="" src="/legacy/2015-05-25-Time-Tag/django-compressor.png" style="width: 800px;" /&gt;
+&lt;p class="caption"&gt;Tagging History for django-compressor&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="figure"&gt;
+&lt;img alt="" src="/legacy/2015-05-25-Time-Tag/gunicorn.png" style="width: 800px;" /&gt;
+&lt;p class="caption"&gt;Tagging History for Gunicorn&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="figure"&gt;
+&lt;img alt="" src="/legacy/2015-05-25-Time-Tag/nginx.png" style="width: 800px;" /&gt;
+&lt;p class="caption"&gt;Tagging History for Nginx&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="section" id="discussion"&gt;
+&lt;h2&gt;Discussion&lt;/h2&gt;
+&lt;p&gt;I think the most interesting graph is Ansible's. The Ansible project
+has an incredibly steady tagging practice. I immediately assume that
+this stability is due to the fact that Ansible has a number of incentives to
+release steadily. Ansible is, after all, a product people pay for. After
+seeing Nginx's graph, I'm pretty confident that we'd see some similarly
+steady trends in other psuedo-commercial packages.&lt;/p&gt;
+&lt;/div&gt;
+</summary></entry><entry><title>Dollar Cost Averaging vs. Lump Sum Investments</title><link href="http://plog.logston.me/dollar-cost-averaging-vs-lump-sum-investments.html" rel="alternate"></link><updated>2015-05-09T20:00:00+00:00</updated><author><name>Paul Logston</name></author><id>tag:plog.logston.me,2015-05-09:dollar-cost-averaging-vs-lump-sum-investments.html</id><summary type="html">&lt;div class="section" id="id1"&gt;
+&lt;h2&gt;Dollar Cost Averaging vs. Lump Sum Investments&lt;/h2&gt;
+&lt;p&gt;I'm interested in knowing more about Dollar Cost Averaging (DCA) and how
+this strategy performs relative to a lump sum investment strategy. I've
+created this iPython notebook as a way to organize my thoughts and to
+share my finds.&lt;/p&gt;
+&lt;pre class="code python literal-block"&gt;
+&lt;span class="c1"&gt;# Import everything we need&lt;/span&gt;
+&lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="nn"&gt;datetime&lt;/span&gt;
+&lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="nn"&gt;random&lt;/span&gt;
+
+&lt;span class="o"&gt;%&lt;/span&gt;&lt;span class="n"&gt;matplotlib&lt;/span&gt; &lt;span class="n"&gt;inline&lt;/span&gt;
+&lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="nn"&gt;matplotlib.pyplot&lt;/span&gt; &lt;span class="kn"&gt;as&lt;/span&gt; &lt;span class="nn"&gt;plt&lt;/span&gt;
+&lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="nn"&gt;numpy&lt;/span&gt; &lt;span class="kn"&gt;as&lt;/span&gt; &lt;span class="nn"&gt;np&lt;/span&gt;
+&lt;span class="kn"&gt;from&lt;/span&gt; &lt;span class="nn"&gt;yahoo_finance&lt;/span&gt; &lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="n"&gt;Share&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="code python literal-block"&gt;
+&lt;span class="c1"&gt;# Create a quote object to make later code a bit more readable.&lt;/span&gt;
+&lt;span class="c1"&gt;# I prefer not to index into a dict everytime I need the closing&lt;/span&gt;
+&lt;span class="c1"&gt;# price of a stock.&lt;/span&gt;
+&lt;span class="k"&gt;class&lt;/span&gt; &lt;span class="nc"&gt;Quote&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nb"&gt;object&lt;/span&gt;&lt;span class="p"&gt;):&lt;/span&gt;
+    &lt;span class="k"&gt;def&lt;/span&gt; &lt;span class="nf"&gt;__init__&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="bp"&gt;self&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;quote_dict&lt;/span&gt;&lt;span class="p"&gt;):&lt;/span&gt;
+        &lt;span class="bp"&gt;self&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;symbol&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;quote_dict&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;'Symbol'&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt;
+        &lt;span class="bp"&gt;self&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;date&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;datetime&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;datetime&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;strptime&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;quote_dict&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;'Date'&lt;/span&gt;&lt;span class="p"&gt;],&lt;/span&gt; &lt;span class="s1"&gt;'%Y-%m-&lt;/span&gt;&lt;span class="si"&gt;%d&lt;/span&gt;&lt;span class="s1"&gt;'&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;date&lt;/span&gt;&lt;span class="p"&gt;()&lt;/span&gt;
+        &lt;span class="bp"&gt;self&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;high&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="nb"&gt;float&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;quote_dict&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;'High'&lt;/span&gt;&lt;span class="p"&gt;])&lt;/span&gt;
+        &lt;span class="bp"&gt;self&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;low&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="nb"&gt;float&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;quote_dict&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;'Low'&lt;/span&gt;&lt;span class="p"&gt;])&lt;/span&gt;
+        &lt;span class="bp"&gt;self&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;open&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="nb"&gt;float&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;quote_dict&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;'Open'&lt;/span&gt;&lt;span class="p"&gt;])&lt;/span&gt;
+        &lt;span class="bp"&gt;self&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;close&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="nb"&gt;float&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;quote_dict&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;'Close'&lt;/span&gt;&lt;span class="p"&gt;])&lt;/span&gt;
+        &lt;span class="bp"&gt;self&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;adj_close&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="nb"&gt;float&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;quote_dict&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;'Adj_Close'&lt;/span&gt;&lt;span class="p"&gt;])&lt;/span&gt;
+        &lt;span class="bp"&gt;self&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;volume&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="nb"&gt;int&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;quote_dict&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;'Volume'&lt;/span&gt;&lt;span class="p"&gt;])&lt;/span&gt;
+
+    &lt;span class="k"&gt;def&lt;/span&gt; &lt;span class="nf"&gt;__repr__&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="bp"&gt;self&lt;/span&gt;&lt;span class="p"&gt;):&lt;/span&gt;
+        &lt;span class="k"&gt;return&lt;/span&gt; &lt;span class="s1"&gt;'&amp;lt;Quote {} {}&amp;gt;'&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;format&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="bp"&gt;self&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;symbol&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="bp"&gt;self&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;date&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="code python literal-block"&gt;
+&lt;span class="c1"&gt;# Let's define the stock and the range of&lt;/span&gt;
+&lt;span class="c1"&gt;# stock history that we are interested in&lt;/span&gt;
+&lt;span class="n"&gt;stock_ticker_symbol&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="s1"&gt;'SNP'&lt;/span&gt;
+&lt;span class="n"&gt;start&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;end&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="s1"&gt;'2007-04-30'&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="s1"&gt;'2014-04-29'&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="code python literal-block"&gt;
+&lt;span class="c1"&gt;# Get the data and sort it.&lt;/span&gt;
+&lt;span class="n"&gt;stock&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;Share&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;stock_ticker_symbol&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;stock_history&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;stock&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;get_historical&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;start&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;end&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;stock_history&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="n"&gt;Quote&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;q&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="k"&gt;for&lt;/span&gt; &lt;span class="n"&gt;q&lt;/span&gt; &lt;span class="ow"&gt;in&lt;/span&gt; &lt;span class="n"&gt;stock_history&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt;
+&lt;span class="n"&gt;stock_history&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;sort&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;key&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="k"&gt;lambda&lt;/span&gt; &lt;span class="n"&gt;q&lt;/span&gt;&lt;span class="p"&gt;:&lt;/span&gt; &lt;span class="n"&gt;q&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;date&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="code python literal-block"&gt;
+&lt;span class="c1"&gt;# Number of days of stock history&lt;/span&gt;
+&lt;span class="n"&gt;days&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="nb"&gt;len&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;stock_history&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;days&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="literal-block"&gt;
+1763
+&lt;/pre&gt;
+&lt;pre class="code python literal-block"&gt;
+&lt;span class="n"&gt;plt&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;subplots&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;figsize&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="mi"&gt;16&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;&lt;span class="mi"&gt;5&lt;/span&gt;&lt;span class="p"&gt;))&lt;/span&gt;
+&lt;span class="n"&gt;plt&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;plot&lt;/span&gt;&lt;span class="p"&gt;([&lt;/span&gt;&lt;span class="n"&gt;q&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;date&lt;/span&gt; &lt;span class="k"&gt;for&lt;/span&gt; &lt;span class="n"&gt;q&lt;/span&gt; &lt;span class="ow"&gt;in&lt;/span&gt; &lt;span class="n"&gt;stock_history&lt;/span&gt;&lt;span class="p"&gt;],&lt;/span&gt; &lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="n"&gt;q&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;close&lt;/span&gt; &lt;span class="k"&gt;for&lt;/span&gt; &lt;span class="n"&gt;q&lt;/span&gt; &lt;span class="ow"&gt;in&lt;/span&gt; &lt;span class="n"&gt;stock_history&lt;/span&gt;&lt;span class="p"&gt;],&lt;/span&gt;
+         &lt;span class="n"&gt;label&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="n"&gt;stock_ticker_symbol&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;plt&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;title&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;stock_ticker_symbol&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;plt&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;xlabel&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;'Time'&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;plt&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;ylabel&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;'Closing Price ($)'&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;plt&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;legend&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;bbox_to_anchor&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mf"&gt;0.85&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mf"&gt;0.102&lt;/span&gt;&lt;span class="p"&gt;),&lt;/span&gt; &lt;span class="n"&gt;loc&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;ncol&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;borderaxespad&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;plt&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;show&lt;/span&gt;&lt;span class="p"&gt;()&lt;/span&gt;
+&lt;/pre&gt;
+&lt;img alt="" src="/legacy/2015-05-09-Dollar-Cost-Averaging/output_7_0.png" /&gt;
+&lt;div class="section" id="lump-sum-purchase"&gt;
+&lt;h3&gt;Lump Sum Purchase&lt;/h3&gt;
+&lt;p&gt;Let's take a look at the case where we invest a dollar for each day of
+stock history that we have. However we invest all of that money up front
+on the first day of our stock history.&lt;/p&gt;
+&lt;pre class="code python literal-block"&gt;
+&lt;span class="c1"&gt;# Price on day 0&lt;/span&gt;
+&lt;span class="n"&gt;stock_history&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;close&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="literal-block"&gt;
+87.21
+&lt;/pre&gt;
+&lt;pre class="code python literal-block"&gt;
+&lt;span class="c1"&gt;# If I bought (number of days from start to end) dollars worth of&lt;/span&gt;
+&lt;span class="c1"&gt;# shares on day 0, I'd have this many shares:&lt;/span&gt;
+&lt;span class="n"&gt;dollars_invested&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;days&lt;/span&gt;
+&lt;span class="n"&gt;shares&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;dollars_invested&lt;/span&gt; &lt;span class="o"&gt;/&lt;/span&gt; &lt;span class="n"&gt;stock_history&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;close&lt;/span&gt;
+&lt;span class="n"&gt;shares&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="literal-block"&gt;
+20.215571608760463
+&lt;/pre&gt;
+&lt;pre class="code python literal-block"&gt;
+&lt;span class="k"&gt;for&lt;/span&gt; &lt;span class="n"&gt;day&lt;/span&gt; &lt;span class="ow"&gt;in&lt;/span&gt; &lt;span class="n"&gt;stock_history&lt;/span&gt;&lt;span class="p"&gt;:&lt;/span&gt;
+    &lt;span class="c1"&gt;# let's take note of how much our holdings&lt;/span&gt;
+    &lt;span class="c1"&gt;# are on each day so we can make a graph&lt;/span&gt;
+    &lt;span class="n"&gt;day&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;lmp_holdings_value&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;shares&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt; &lt;span class="n"&gt;day&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;close&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="code python literal-block"&gt;
+&lt;span class="c1"&gt;# Price on last day&lt;/span&gt;
+&lt;span class="n"&gt;stock_history&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="o"&gt;-&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;close&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="literal-block"&gt;
+89.36
+&lt;/pre&gt;
+&lt;pre class="code python literal-block"&gt;
+&lt;span class="c1"&gt;# If I sold all my shares on the last day,&lt;/span&gt;
+&lt;span class="c1"&gt;# I'd have this much cash:&lt;/span&gt;
+&lt;span class="n"&gt;holdings_value&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;shares&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt; &lt;span class="n"&gt;stock_history&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="o"&gt;-&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;close&lt;/span&gt;
+&lt;span class="n"&gt;holdings_value&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="literal-block"&gt;
+1806.463478958835
+&lt;/pre&gt;
+&lt;pre class="code python literal-block"&gt;
+&lt;span class="c1"&gt;# Thus my ROI would be:&lt;/span&gt;
+&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;holdings_value&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt; &lt;span class="n"&gt;dollars_invested&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="o"&gt;/&lt;/span&gt; &lt;span class="n"&gt;dollars_invested&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="literal-block"&gt;
+0.02465313610824442
+&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div class="section" id="dollar-cost-averaging"&gt;
+&lt;h3&gt;Dollar Cost Averaging&lt;/h3&gt;
+&lt;p&gt;Now let's take a look at a similar case (where we invest a dollar for
+each day of stock history that we have) but instead of investing all of
+the money upfront, we invest one dollar on each day of our stock
+history.&lt;/p&gt;
+&lt;pre class="code python literal-block"&gt;
+&lt;span class="n"&gt;total_shares&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;
+&lt;span class="k"&gt;for&lt;/span&gt; &lt;span class="n"&gt;day&lt;/span&gt; &lt;span class="ow"&gt;in&lt;/span&gt; &lt;span class="n"&gt;stock_history&lt;/span&gt;&lt;span class="p"&gt;:&lt;/span&gt;
+    &lt;span class="c1"&gt;# Buy one dollar's worth of shares each day&lt;/span&gt;
+    &lt;span class="n"&gt;shares_per_dollar&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="mi"&gt;1&lt;/span&gt; &lt;span class="o"&gt;/&lt;/span&gt; &lt;span class="n"&gt;day&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;close&lt;/span&gt;
+    &lt;span class="n"&gt;total_shares&lt;/span&gt; &lt;span class="o"&gt;+=&lt;/span&gt; &lt;span class="n"&gt;shares_per_dollar&lt;/span&gt;
+    &lt;span class="c1"&gt;# let's take note of how much our holdings&lt;/span&gt;
+    &lt;span class="c1"&gt;# are on this day so we can make a graph&lt;/span&gt;
+    &lt;span class="n"&gt;day&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;dca_holdings_value&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;total_shares&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt; &lt;span class="n"&gt;day&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;close&lt;/span&gt;
+
+&lt;span class="c1"&gt;# On the last day, I'd have this many shares&lt;/span&gt;
+&lt;span class="n"&gt;total_shares&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="literal-block"&gt;
+19.52774974818405
+&lt;/pre&gt;
+&lt;pre class="code python literal-block"&gt;
+&lt;span class="c1"&gt;# On the last day, I'd have this much cash&lt;/span&gt;
+&lt;span class="n"&gt;holdings_value&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;stock_history&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="o"&gt;-&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;dca_holdings_value&lt;/span&gt;
+&lt;span class="n"&gt;holdings_value&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="literal-block"&gt;
+1744.9997174977266
+&lt;/pre&gt;
+&lt;pre class="code python literal-block"&gt;
+&lt;span class="c1"&gt;# Thus my ROI would be:&lt;/span&gt;
+&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;holdings_value&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt; &lt;span class="n"&gt;dollars_invested&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="o"&gt;/&lt;/span&gt; &lt;span class="n"&gt;dollars_invested&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="literal-block"&gt;
+-0.010210029780075678
+&lt;/pre&gt;
+&lt;pre class="code python literal-block"&gt;
+&lt;span class="n"&gt;plt&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;subplots&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;figsize&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="mi"&gt;16&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;&lt;span class="mi"&gt;5&lt;/span&gt;&lt;span class="p"&gt;))&lt;/span&gt;
+&lt;span class="n"&gt;plt&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;plot&lt;/span&gt;&lt;span class="p"&gt;([&lt;/span&gt;&lt;span class="n"&gt;q&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;date&lt;/span&gt; &lt;span class="k"&gt;for&lt;/span&gt; &lt;span class="n"&gt;q&lt;/span&gt; &lt;span class="ow"&gt;in&lt;/span&gt; &lt;span class="n"&gt;stock_history&lt;/span&gt;&lt;span class="p"&gt;],&lt;/span&gt; &lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="n"&gt;q&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;lmp_holdings_value&lt;/span&gt; &lt;span class="k"&gt;for&lt;/span&gt; &lt;span class="n"&gt;q&lt;/span&gt; &lt;span class="ow"&gt;in&lt;/span&gt; &lt;span class="n"&gt;stock_history&lt;/span&gt;&lt;span class="p"&gt;],&lt;/span&gt; &lt;span class="n"&gt;label&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="s2"&gt;&amp;quot;Lump Sum&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;plt&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;plot&lt;/span&gt;&lt;span class="p"&gt;([&lt;/span&gt;&lt;span class="n"&gt;q&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;date&lt;/span&gt; &lt;span class="k"&gt;for&lt;/span&gt; &lt;span class="n"&gt;q&lt;/span&gt; &lt;span class="ow"&gt;in&lt;/span&gt; &lt;span class="n"&gt;stock_history&lt;/span&gt;&lt;span class="p"&gt;],&lt;/span&gt; &lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="n"&gt;q&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;dca_holdings_value&lt;/span&gt; &lt;span class="k"&gt;for&lt;/span&gt; &lt;span class="n"&gt;q&lt;/span&gt; &lt;span class="ow"&gt;in&lt;/span&gt; &lt;span class="n"&gt;stock_history&lt;/span&gt;&lt;span class="p"&gt;],&lt;/span&gt; &lt;span class="n"&gt;label&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="s2"&gt;&amp;quot;Dollar Cost Averaging&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;plt&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;title&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;'Value of holdings vs. Time'&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;plt&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;xlabel&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;'Time'&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;plt&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;ylabel&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;'Closing Price ($)'&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;plt&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;legend&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;bbox_to_anchor&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mf"&gt;0.88&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mf"&gt;0.102&lt;/span&gt;&lt;span class="p"&gt;),&lt;/span&gt; &lt;span class="n"&gt;loc&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;ncol&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="mi"&gt;3&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;borderaxespad&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;plt&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;show&lt;/span&gt;&lt;span class="p"&gt;()&lt;/span&gt;
+&lt;/pre&gt;
+&lt;img alt="" src="/legacy/2015-05-09-Dollar-Cost-Averaging/output_21_0.png" /&gt;
+&lt;/div&gt;
+&lt;div class="section" id="conclusions-thus-far"&gt;
+&lt;h3&gt;Conclusions Thus Far&lt;/h3&gt;
+&lt;p&gt;I'm not super impressed by DCA. From what I've seen above, the DCA
+strategy seems slow and not that performant.&lt;/p&gt;
+&lt;p&gt;My question now is, did I pick a bad start date for my interval of
+history? If I picked a different start date and ran the same equations
+over that interval of history and prices, would I see different results?
+The question that follows is, how many different start dates would I
+have to try before I saw the DCA strategy out perform the lump sum
+strategy? How about all of them? How about I try starting my stock
+history on each day of the real stock history. We'll keep the ends of
+each stock history interval pinned to the last day of the real stock
+history. That would give me &amp;quot;&lt;tt class="docutils literal"&gt;days&lt;/tt&gt;&amp;quot; intervals to check.&lt;/p&gt;
+&lt;p&gt;For example:&lt;/p&gt;
+&lt;pre class="literal-block"&gt;
+Interval 1: start day = day 0 of stock history
+Interval 2: start day = day 1 of stock history
+&lt;/pre&gt;
+&lt;pre class="code python literal-block"&gt;
+&lt;span class="c1"&gt;# Let's create a function to calculate the ROI values for&lt;/span&gt;
+&lt;span class="c1"&gt;# both strategy's for a given start date.&lt;/span&gt;
+
+&lt;span class="k"&gt;def&lt;/span&gt; &lt;span class="nf"&gt;get_roi&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;start_day&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="bp"&gt;None&lt;/span&gt;&lt;span class="p"&gt;):&lt;/span&gt;
+    &lt;span class="sd"&gt;&amp;quot;&amp;quot;&amp;quot;
+    Determine the performance of the lump sum method of investing
+    vs. the dollar cost averaging method. Start investing from
+    start_day which is an index into the list of days of stock history.
+
+    If start_day is not given, choose a random day in between the
+    end and the beginning of stock_history.
+    &amp;quot;&amp;quot;&amp;quot;&lt;/span&gt;
+    &lt;span class="n"&gt;start_day&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;start_day&lt;/span&gt; &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="n"&gt;start_day&lt;/span&gt; &lt;span class="ow"&gt;is&lt;/span&gt; &lt;span class="ow"&gt;not&lt;/span&gt; &lt;span class="bp"&gt;None&lt;/span&gt; &lt;span class="k"&gt;else&lt;/span&gt; &lt;span class="n"&gt;random&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;randint&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;days&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt; &lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+    &lt;span class="n"&gt;interval_history&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;stock_history&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="n"&gt;start_day&lt;/span&gt;&lt;span class="p"&gt;:]&lt;/span&gt;
+    &lt;span class="n"&gt;num_of_days&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="nb"&gt;len&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;interval_history&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+
+    &lt;span class="c1"&gt;# Lump Sum Method&lt;/span&gt;
+    &lt;span class="n"&gt;price_on_day_0&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;interval_history&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;close&lt;/span&gt;
+    &lt;span class="n"&gt;dollars_invested&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;num_of_days&lt;/span&gt;
+    &lt;span class="n"&gt;shares_purchased&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;dollars_invested&lt;/span&gt; &lt;span class="o"&gt;/&lt;/span&gt; &lt;span class="n"&gt;interval_history&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;close&lt;/span&gt;
+    &lt;span class="n"&gt;dollars_on_last_day&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;shares_purchased&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt; &lt;span class="n"&gt;interval_history&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="o"&gt;-&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;close&lt;/span&gt;
+    &lt;span class="n"&gt;lump_sum_roi&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;dollars_on_last_day&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt; &lt;span class="n"&gt;dollars_invested&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="o"&gt;/&lt;/span&gt; &lt;span class="n"&gt;dollars_invested&lt;/span&gt;
+
+    &lt;span class="c1"&gt;# Dollar Cost Averaging&lt;/span&gt;
+    &lt;span class="n"&gt;shares_purchased&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;
+    &lt;span class="n"&gt;dollars_to_invest_per_day&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;dollars_invested&lt;/span&gt; &lt;span class="o"&gt;/&lt;/span&gt; &lt;span class="n"&gt;num_of_days&lt;/span&gt;
+    &lt;span class="k"&gt;for&lt;/span&gt; &lt;span class="n"&gt;day&lt;/span&gt; &lt;span class="ow"&gt;in&lt;/span&gt; &lt;span class="n"&gt;interval_history&lt;/span&gt;&lt;span class="p"&gt;:&lt;/span&gt;
+        &lt;span class="n"&gt;shares_purchased&lt;/span&gt; &lt;span class="o"&gt;+=&lt;/span&gt; &lt;span class="n"&gt;dollars_to_invest_per_day&lt;/span&gt; &lt;span class="o"&gt;/&lt;/span&gt; &lt;span class="n"&gt;day&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;close&lt;/span&gt;
+    &lt;span class="n"&gt;dollars_on_last_day&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;shares_purchased&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt; &lt;span class="n"&gt;interval_history&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="o"&gt;-&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;close&lt;/span&gt;
+    &lt;span class="n"&gt;dca_roi&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;dollars_on_last_day&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt; &lt;span class="n"&gt;dollars_invested&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="o"&gt;/&lt;/span&gt; &lt;span class="n"&gt;dollars_invested&lt;/span&gt;
+
+    &lt;span class="k"&gt;return&lt;/span&gt; &lt;span class="n"&gt;lump_sum_roi&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;dca_roi&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="code python literal-block"&gt;
+&lt;span class="c1"&gt;# Lets compare each strategy's ROI for each possible&lt;/span&gt;
+&lt;span class="c1"&gt;# investment start date in our real stock history.&lt;/span&gt;
+&lt;span class="n"&gt;dca_better_than_lump_count&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;intervals&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;days&lt;/span&gt;
+&lt;span class="k"&gt;for&lt;/span&gt; &lt;span class="n"&gt;day&lt;/span&gt; &lt;span class="ow"&gt;in&lt;/span&gt; &lt;span class="nb"&gt;range&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;intervals&lt;/span&gt;&lt;span class="p"&gt;):&lt;/span&gt;
+    &lt;span class="n"&gt;lump&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;dca&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;get_roi&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;day&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+    &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="n"&gt;dca&lt;/span&gt; &lt;span class="o"&gt;&amp;gt;&lt;/span&gt; &lt;span class="n"&gt;lump&lt;/span&gt;&lt;span class="p"&gt;:&lt;/span&gt;
+        &lt;span class="n"&gt;dca_better_than_lump_count&lt;/span&gt; &lt;span class="o"&gt;+=&lt;/span&gt; &lt;span class="mi"&gt;1&lt;/span&gt;
+
+&lt;span class="c1"&gt;# Percentage of time the DCA method out performed the lump sum method&lt;/span&gt;
+&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;dca_better_than_lump_count&lt;/span&gt; &lt;span class="o"&gt;/&lt;/span&gt; &lt;span class="n"&gt;intervals&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt; &lt;span class="mi"&gt;100&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="literal-block"&gt;
+52.07033465683494
+&lt;/pre&gt;
+&lt;p&gt;Wow! 52% of the time, DCA's ROI is greater than lump sum's strategy. I'd
+still like to see how that's possible. Maybe a graph will help.&lt;/p&gt;
+&lt;pre class="code python literal-block"&gt;
+&lt;span class="c1"&gt;# Let's get those same ROI numbers from before, convert&lt;/span&gt;
+&lt;span class="c1"&gt;# them to percentages, and then plot them.&lt;/span&gt;
+&lt;span class="n"&gt;lumps&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;dcas&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="p"&gt;[],&lt;/span&gt; &lt;span class="p"&gt;[]&lt;/span&gt;
+&lt;span class="k"&gt;for&lt;/span&gt; &lt;span class="n"&gt;day_index&lt;/span&gt; &lt;span class="ow"&gt;in&lt;/span&gt; &lt;span class="nb"&gt;range&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nb"&gt;len&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;stock_history&lt;/span&gt;&lt;span class="p"&gt;)):&lt;/span&gt;
+    &lt;span class="n"&gt;lump&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;dca&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;get_roi&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;day_index&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+    &lt;span class="n"&gt;lumps&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;append&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;lump&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt; &lt;span class="mi"&gt;100&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+    &lt;span class="n"&gt;dcas&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;append&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;dca&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt; &lt;span class="mi"&gt;100&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="code python literal-block"&gt;
+&lt;span class="n"&gt;plt&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;subplots&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;figsize&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="mi"&gt;16&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;&lt;span class="mi"&gt;5&lt;/span&gt;&lt;span class="p"&gt;))&lt;/span&gt;
+&lt;span class="n"&gt;plt&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;plot&lt;/span&gt;&lt;span class="p"&gt;([&lt;/span&gt;&lt;span class="n"&gt;q&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;date&lt;/span&gt; &lt;span class="k"&gt;for&lt;/span&gt; &lt;span class="n"&gt;q&lt;/span&gt; &lt;span class="ow"&gt;in&lt;/span&gt; &lt;span class="n"&gt;stock_history&lt;/span&gt;&lt;span class="p"&gt;],&lt;/span&gt; &lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="n"&gt;lumps&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="n"&gt;i&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt; &lt;span class="k"&gt;for&lt;/span&gt; &lt;span class="n"&gt;i&lt;/span&gt; &lt;span class="ow"&gt;in&lt;/span&gt; &lt;span class="nb"&gt;range&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;days&lt;/span&gt;&lt;span class="p"&gt;)],&lt;/span&gt; &lt;span class="n"&gt;label&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="s2"&gt;&amp;quot;Lump Sum&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;plt&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;plot&lt;/span&gt;&lt;span class="p"&gt;([&lt;/span&gt;&lt;span class="n"&gt;q&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;date&lt;/span&gt; &lt;span class="k"&gt;for&lt;/span&gt; &lt;span class="n"&gt;q&lt;/span&gt; &lt;span class="ow"&gt;in&lt;/span&gt; &lt;span class="n"&gt;stock_history&lt;/span&gt;&lt;span class="p"&gt;],&lt;/span&gt; &lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="n"&gt;dcas&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="n"&gt;i&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt; &lt;span class="k"&gt;for&lt;/span&gt; &lt;span class="n"&gt;i&lt;/span&gt; &lt;span class="ow"&gt;in&lt;/span&gt; &lt;span class="nb"&gt;range&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;days&lt;/span&gt;&lt;span class="p"&gt;)],&lt;/span&gt; &lt;span class="n"&gt;label&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="s2"&gt;&amp;quot;Dollar Cost Averaging&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;plt&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;title&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;'% ROI vs. Investment Start Date'&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;plt&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;xlabel&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;'Investment Start Date'&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;plt&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;ylabel&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;'ROI (%)'&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;plt&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;legend&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;bbox_to_anchor&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mf"&gt;0.88&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mf"&gt;0.102&lt;/span&gt;&lt;span class="p"&gt;),&lt;/span&gt; &lt;span class="n"&gt;loc&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;ncol&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;borderaxespad&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;plt&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;show&lt;/span&gt;&lt;span class="p"&gt;()&lt;/span&gt;
+&lt;/pre&gt;
+&lt;img alt="" src="/legacy/2015-05-09-Dollar-Cost-Averaging/output_28_0.png" /&gt;
+&lt;p&gt;Wow! This graph says a lot. For a given investment start date, we can
+see the ROI for each investment strategy. Dollar cost averaging really
+gives us a great deal of security while investing in any market
+conditions. Our money doesn't really seem to grow much via the DCA
+strategy but it also doesn't shrink much at all. Compared with the lump
+sum strategy, the DCA strategy introduces almost zero risk due to
+&amp;quot;investing at the wrong time&amp;quot;.&lt;/p&gt;
+&lt;p&gt;So what is DCA good for? From what I can tell, dollar cost averaging is
+a techinque to safely invest in the stock market. We take on much less
+risk of loosing value because the market has gone down by investing via
+the DCA strategy. We won't really gain much value, if any, from bull
+markets but we won't loose much value from bear markets either. So why
+do value investors encourage the use of DCA? I assume they plan to make
+their money on the dividends; more reaserch to be done.&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+</summary></entry><entry><title>iPhone Gel Electrophoresis Chamber</title><link href="http://plog.logston.me/iphone-gel-electrophoresis-chamber.html" rel="alternate"></link><updated>2015-01-01T15:22:00+00:00</updated><author><name>Paul Logston</name></author><id>tag:plog.logston.me,2015-01-01:iphone-gel-electrophoresis-chamber.html</id><summary type="html">&lt;div class="section" id="introduction"&gt;
+&lt;h2&gt;Introduction&lt;/h2&gt;
+&lt;p&gt;I've wanted a gel electrophoresis chamber for a while. I've held back because
+they cost like $300 and I don't want to spend that much on a tool that won't
+get used all that often. So, with a bit of my new years eve 2014, I decided
+to make my own.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="section" id="methods"&gt;
+&lt;h2&gt;Methods&lt;/h2&gt;
+&lt;p&gt;I had all the supplies I needed:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;ul class="simple"&gt;
+&lt;li&gt;1 iPhone 5C case.&lt;/li&gt;
+&lt;li&gt;1 piece of crumpled tin foil&lt;/li&gt;
+&lt;li&gt;1 blackberry.&lt;/li&gt;
+&lt;li&gt;1 bottle of Malbec&lt;/li&gt;
+&lt;li&gt;a few hours of free time.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;I used my girlfriend's iPhone 5C case as the chamber.&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img alt="" src="/legacy/2015-01-01-iphone-electrophoresis/IMG_2557.jpg" style="width: 800px;" /&gt;
+&lt;p class="caption"&gt;Chamber construction from iPhone case&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;I used the top of the case to build a comb.
+(Note: Cutting Apple plastic is quite difficult. Yet another
+prop to Apple on their packaging. Not only is their packaging elegant and
+precise, it is structurally integrous).&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img alt="" src="/legacy/2015-01-01-iphone-electrophoresis/IMG_2558.jpg" style="width: 800px;" /&gt;
+&lt;p class="caption"&gt;Making the comb&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;I used baking soda and distilled H2O for my buffer. Two grams of baking soda
+was added to 200ml of distilled water.&lt;/p&gt;
+&lt;p&gt;I had agar around for making petri dishes so I added 1 gram of agar to
+100ml of my buffer. (Possible problem #1: Since I used nutrient agar,
+the nutrients in the agar may have
+interfered with the movement of the compounds within the samples used.)&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img alt="" src="/legacy/2015-01-01-iphone-electrophoresis/IMG_2560.jpg" style="width: 400px;" /&gt;
+&lt;p class="caption"&gt;Agar&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;The &lt;a class="reference external" href="http://www.sciencebuddies.org/science-fair-projects/project_ideas/BioChem_p028.shtml#procedure"&gt;instructions&lt;/a&gt; for building a gel electrophoresis chamber that I followed
+said to heat the agar solution in the microwave. However, I didn't care to
+follow the directions to &lt;em&gt;stop the microwave every 10-15 seconds to stir the
+solution&lt;/em&gt;.&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img alt="" src="/legacy/2015-01-01-iphone-electrophoresis/IMG_2562.jpg" style="width: 400px;" /&gt;
+&lt;p class="caption"&gt;Agar overflow in microwave&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;I'm very satisfied with the decision I made.&lt;/p&gt;
+&lt;p&gt;I poured the hot agar/buffer solution into my electroded (ie. Aluminium foil
+wrapped on each side of the iphone case) electrophoresis chamber. I plopped my
+comb into the chamber and let it sit for 30 minutes.&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img alt="" src="/legacy/2015-01-01-iphone-electrophoresis/IMG_2564.jpg" style="width: 800px;" /&gt;
+&lt;p class="caption"&gt;Electrophoresis chamber with liquid agar solution&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;After 30 minutes,
+I pulled out the comb, and I let the chamber sit for an hour while I went to
+dinner. &lt;a class="reference external" href="http://www.yatengabistro.com/"&gt;Yatenga&lt;/a&gt;, right around the corner from my apartment. Steak was okay,
+to much fat for my taste. But the grilled veggies were fantastic! Just the
+right amount of soft texture and flavor.&lt;/p&gt;
+&lt;p&gt;When I got back, I filled the wells with anything I found interesting.
+Well 1 was filled with soap, Well 2 with Malbec, Well 3 with fruit juice,
+and Well 4 with the juice from a blackberry I squished. (Problem #2: These
+samples were probably not the best to use for seeing results
+of gel electrophoresis with the naked eye.)&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img alt="" src="/legacy/2015-01-01-iphone-electrophoresis/IMG_2566.jpg" style="height: 400px;" /&gt;
+&lt;p class="caption"&gt;Revo lution Malbec&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="figure"&gt;
+&lt;img alt="" src="/legacy/2015-01-01-iphone-electrophoresis/IMG_2567.jpg" style="width: 800px;" /&gt;
+&lt;p class="caption"&gt;Electrophoresis chamber with liquid sample weight boats&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;(Possible problem #3: I didn't let the buffer go into the well first.
+Maybe that lack of buffer in between the sample and the gel significantly
+cuts down on the conduction between the two.)&lt;/p&gt;
+&lt;p&gt;I took a measurement of the resistance across (length-wise) the chamber
+and agar. I measured 8 kohms of resistance across 10cm of agar. Then I poured
+in 25 ml of buffer to submerge the gel.&lt;/p&gt;
+&lt;blockquote&gt;
+After I added the buffer, I got some
+weird numbers for the resistance across the chamber.
+The resistance started out at about 160 kohms and kept climbing.
+Now that I am thinking about it, those numbers make some sense.
+The buffer may have been corroding the
+multi-meter probes and this corrosion caused them to build up a
+layer of tarnish that kept them from conducting. Or
+maybe the bubbles from the
+corrosion were preventing good conduction between the probes and the
+buffer.&lt;/blockquote&gt;
+&lt;p&gt;Then I hooked up an alligator clip to each electrode and took a
+final measurement of resistance. I measured 15.05 kohms across the
+alligator clips and chamber; much better (or at least consistent) number!&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img alt="" src="/legacy/2015-01-01-iphone-electrophoresis/IMG_2568.jpg" style="width: 400px;" /&gt;
+&lt;p class="caption"&gt;Electrophoresis chamber ready for run&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;A voltage of 12 VDC was applied on either end of the chamber. (Problem #4:
+This amount of voltage is nowhere near the amount that I would have liked to
+apply. 100 VDC would have been my choice but I didn't have the supplies to
+apply that amount of voltage safely)&lt;/p&gt;
+&lt;p&gt;To kill time until the ball dropped, we started to watch the movie Melancolia.
+Gorgeous visuals, but a friend I was with wasn't into the movie so we
+bailed on it and started Frequencies (Netflix baby).&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;Side thought after watching Frequencies:&lt;/p&gt;
+&lt;p&gt;If a machine can discover that it can control itself, does that
+make it any less a machine? If a machine discovers that it can
+control itself, does its act of making a choice
+(whether to do so and control itself or not to)
+make it any less a machine? What is a decision and
+is it the defining characteristic of consciousness? Maybe.&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;/div&gt;
+&lt;div class="section" id="results"&gt;
+&lt;h2&gt;Results&lt;/h2&gt;
+&lt;p&gt;After the movie, it looked like there was very little movement.&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img alt="" src="/legacy/2015-01-01-iphone-electrophoresis/IMG_2570.jpg" style="width: 800px;" /&gt;
+&lt;p class="caption"&gt;Electrophoresis chamber after 2 hours and 35 minutes&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;From the picture above, it appears that the blackberry squish moved the
+farthest, having moved about 1cm towards the cathode.
+Of course, there is the likely possibility that the
+compounds in the other samples traveled farther but were not visible. Many
+compounds required a stain to be seen with the naked eye.
+Since I didn't have any stains or
+UV lights to check that possibility, blackberry squish won this race by 1cm.&lt;/p&gt;
+&lt;p&gt;If you look closely at t.. figure above, you can see that the gel was beginning
+to pull away from the cathode.&lt;/p&gt;
+&lt;p&gt;Just to see what would happen (ie. the motivation for this entire project),
+I let the gel run overnight. Nine hours later the gel looked quite different.&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img alt="" src="/legacy/2015-01-01-iphone-electrophoresis/IMG_2571.jpg" style="width: 800px;" /&gt;
+&lt;p class="caption"&gt;Electrophoresis chamber after 13 hours&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;The samples were hardly visible. I attribute this lack of visibility
+to diffusion of the samples into the buffer more than anything else.
+What was most impressive was the severe corrosion of the Aluminium foil and
+the pulling away of the gel from the cathode. I assume that the
+pulling away of the gel from the cathode was due to the
+bubbling from the reaction of the Aluminum foil with the buffer under
+a potential gradient.&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img alt="" src="/legacy/2015-01-01-iphone-electrophoresis/IMG_2577.jpg" style="width: 800px;" /&gt;
+&lt;p class="caption"&gt;Aluminum foil corrosion&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="figure"&gt;
+&lt;img alt="" src="/legacy/2015-01-01-iphone-electrophoresis/IMG_2572.jpg" style="width: 800px;" /&gt;
+&lt;p class="caption"&gt;Gel pulling away from electrode&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;Before I threw away the gel, I decided to look at the areas around the wells
+a bit more closely. I chopped up a few pieces of the gel and put them under the
+microscope. Here are the results.&lt;/p&gt;
+&lt;div class="figure"&gt;
+&lt;img alt="" src="/legacy/2015-01-01-iphone-electrophoresis/IMG_0742.jpg" style="width: 800px;" /&gt;
+&lt;p class="caption"&gt;Control - squished agar.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="figure"&gt;
+&lt;img alt="" src="/legacy/2015-01-01-iphone-electrophoresis/IMG_0747_48_merge.jpg" style="width: 800px;" /&gt;
+&lt;p class="caption"&gt;Piece of blackberry?&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="figure"&gt;
+&lt;img alt="" src="/legacy/2015-01-01-iphone-electrophoresis/IMG_0755.jpg" style="width: 800px;" /&gt;
+&lt;p class="caption"&gt;Broken plates of agar&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="figure"&gt;
+&lt;img alt="" src="/legacy/2015-01-01-iphone-electrophoresis/IMG_0761.jpg" style="width: 800px;" /&gt;
+&lt;p class="caption"&gt;Corroded Aluminum foil / An upside down seahorse playing a recorder&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="section" id="conclusion"&gt;
+&lt;h2&gt;Conclusion&lt;/h2&gt;
+&lt;p&gt;I had a lot of fun and ended up watching the rest of Melancolia the next day!&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="section" id="sciencey-conclusion"&gt;
+&lt;h2&gt;Sciencey Conclusion&lt;/h2&gt;
+&lt;p&gt;The gel electrophoresis chamber did appear to work although how well it
+worked will never be known. Only naked eye observations of sample movement
+were made; no staining was done to check for bands of
+compounds with different molecular weights and shapes.&lt;/p&gt;
+&lt;/div&gt;
+</summary></entry><entry><title>Time Warner Cable</title><link href="http://plog.logston.me/time-warner-cable.html" rel="alternate"></link><updated>2014-12-24T01:28:04+00:00</updated><author><name>Paul Logston</name></author><id>tag:plog.logston.me,2014-12-24:time-warner-cable.html</id><summary type="html">&lt;div class="section" id="motivation"&gt;
+&lt;h2&gt;Motivation&lt;/h2&gt;
+&lt;p&gt;I love the internet. Unfortunately, my ISP doesn't always deliver. I am a
+customer with Time Warner Cable and I have, on occasion, found that latency is
+super high or that I don't have a connection at all. These occurrences are not
+frequent enough to call Time Warner about but they are annoying.
+For the record, I would consider switching ISPs, but I don't have any other options.
+Time Warner is the only ISP available where I live.&lt;/p&gt;
+&lt;p&gt;In order to empower myself a bit, I decided to take measurements of my
+ping time for a month and determine how bad my situation is. Maybe my
+brushes with latency and timeouts were anomalies.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="section" id="methods"&gt;
+&lt;h2&gt;Methods&lt;/h2&gt;
+&lt;p&gt;Round trip ping times were collected by an Arduino with an ethernet
+shield. The IP address to which all UDP requests were sent was 8.8.8.8. This
+IP address is one of the IP addresses for Google's DNS servers.&lt;/p&gt;
+&lt;p&gt;The Arduino was run from Tue, 25 Nov 2014 16:54:04 GMT until
+Sat, 20 Dec 2014 17:41:51 GMT.&lt;/p&gt;
+&lt;p&gt;The software loaded onto the Arduino can be downloaded by clicking
+&lt;a class="reference external" href="../legacy/2014-12-24-Time-Warner-Cable/PingLogger.ino"&gt;here&lt;/a&gt;.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="section" id="analysis-and-results"&gt;
+&lt;h2&gt;Analysis and Results&lt;/h2&gt;
+&lt;pre class="code python ipynb-cell literal-block"&gt;
+&lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="nn"&gt;numpy&lt;/span&gt; &lt;span class="kn"&gt;as&lt;/span&gt; &lt;span class="nn"&gt;np&lt;/span&gt;
+&lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="nn"&gt;pandas&lt;/span&gt; &lt;span class="kn"&gt;as&lt;/span&gt; &lt;span class="nn"&gt;pd&lt;/span&gt;
+&lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="nn"&gt;datetime&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="code python ipynb-cell literal-block"&gt;
+&lt;span class="n"&gt;df_raw&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;pd&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;io&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;parsers&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;read_csv&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;'data.csv'&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;df_raw&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;columns&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;'timestamp'&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="s1"&gt;'ping'&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="code python ipynb-cell literal-block"&gt;
+&lt;span class="k"&gt;def&lt;/span&gt; &lt;span class="nf"&gt;isnotint&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;val&lt;/span&gt;&lt;span class="p"&gt;):&lt;/span&gt;
+    &lt;span class="k"&gt;try&lt;/span&gt;&lt;span class="p"&gt;:&lt;/span&gt;
+        &lt;span class="nb"&gt;int&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;val&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+        &lt;span class="k"&gt;return&lt;/span&gt; &lt;span class="bp"&gt;False&lt;/span&gt;
+    &lt;span class="k"&gt;except&lt;/span&gt;&lt;span class="p"&gt;:&lt;/span&gt;
+        &lt;span class="k"&gt;return&lt;/span&gt; &lt;span class="bp"&gt;True&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="code python ipynb-cell literal-block"&gt;
+&lt;span class="c1"&gt;# Probably a better way to do this. Would love to know.&lt;/span&gt;
+&lt;span class="n"&gt;timeout_indices&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;df_raw&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;'ping'&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;map&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;isnotint&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="code python ipynb-cell literal-block"&gt;
+&lt;span class="n"&gt;df_clean&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;df_raw&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;copy&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;deep&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="bp"&gt;True&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;df_clean&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;loc&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="n"&gt;timeout_indices&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="s1"&gt;'ping'&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;
+&lt;span class="n"&gt;df_clean&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;'timestamp'&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;df_clean&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;'timestamp'&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;map&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;datetime&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;datetime&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;fromtimestamp&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;df_clean&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;'ping'&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;df_clean&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;'ping'&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;map&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nb"&gt;int&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="c1"&gt;# Probably a better way to do this.&lt;/span&gt;
+&lt;span class="n"&gt;df_clean&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;dtypes&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="ipynb-literal literal-block"&gt;
+timestamp    datetime64[ns]
+ping                  int64
+dtype: object
+&lt;/pre&gt;
+&lt;pre class="code python ipynb-cell literal-block"&gt;
+&lt;span class="n"&gt;df_timeouts&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;df_raw&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;copy&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;deep&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="bp"&gt;True&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;df_timeouts&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;loc&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="n"&gt;np&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;invert&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;timeout_indices&lt;/span&gt;&lt;span class="p"&gt;),&lt;/span&gt; &lt;span class="s1"&gt;'ping'&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;
+&lt;span class="c1"&gt;# Make timeout pings equal size and 25% longer than the longest ping time recorded.&lt;/span&gt;
+&lt;span class="n"&gt;df_timeouts&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;loc&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="n"&gt;timeout_indices&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="s1"&gt;'ping'&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;df_clean&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;'ping'&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;max&lt;/span&gt;&lt;span class="p"&gt;()&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt; &lt;span class="mf"&gt;1.25&lt;/span&gt;
+&lt;span class="n"&gt;df_timeouts&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;'timestamp'&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;df_timeouts&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;'timestamp'&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;map&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;datetime&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;datetime&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;fromtimestamp&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="code python ipynb-cell literal-block"&gt;
+&lt;span class="c1"&gt;# enable plotting in the current notebook with the inline backend&lt;/span&gt;
+&lt;span class="o"&gt;%&lt;/span&gt;&lt;span class="n"&gt;matplotlib&lt;/span&gt; &lt;span class="n"&gt;inline&lt;/span&gt;
+
+&lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="nn"&gt;matplotlib&lt;/span&gt; &lt;span class="kn"&gt;as&lt;/span&gt; &lt;span class="nn"&gt;mpl&lt;/span&gt;
+&lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="nn"&gt;matplotlib.pyplot&lt;/span&gt; &lt;span class="kn"&gt;as&lt;/span&gt; &lt;span class="nn"&gt;plt&lt;/span&gt;
+
+&lt;span class="n"&gt;pd&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;set_option&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;'display.mpl_style'&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="s1"&gt;'default'&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;  &lt;span class="c1"&gt;# give plots a more pleasing visual style&lt;/span&gt;
+
+&lt;span class="n"&gt;mpl&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;rcParams&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;'figure.figsize'&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="mi"&gt;15&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mi"&gt;10&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="c1"&gt;# Set default figure size&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="code python ipynb-cell literal-block"&gt;
+&lt;span class="n"&gt;fig&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;ax&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;plt&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;subplots&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;ax&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;set_xlabel&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;'Date/Time'&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;ax&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;set_ylabel&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;'Round Trip Ping (ms)'&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;df_timeouts&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;plot&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;x&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="s1"&gt;'timestamp'&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;y&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="s1"&gt;'ping'&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;ax&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="n"&gt;ax&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;legend&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="bp"&gt;False&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;color&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="s1"&gt;'Pink'&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;df_clean&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;plot&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;x&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="s1"&gt;'timestamp'&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;y&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="s1"&gt;'ping'&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;ax&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="n"&gt;ax&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;legend&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="bp"&gt;False&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;color&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="s1"&gt;'DarkGreen'&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="ipynb-literal literal-block"&gt;
+&amp;lt;matplotlib.axes._subplots.AxesSubplot at 0x111cb2588&amp;gt;
+&lt;/pre&gt;
+&lt;img alt="" src="/legacy/2014-12-24-Time-Warner-Cable/ping-test_7_1.png" /&gt;
+&lt;p&gt;Wow! That's a lot of pink! Were the timeouts that evenly dispersed? And I
+know there were quite a number of them, but that many? Approximately 12% of packets
+were dropped (ie. timed out). Lets thin out the data a bit to see the
+distribution of timeouts.&lt;/p&gt;
+&lt;p&gt;Also to note, there seems to be some periodicity to the spikes in
+ping durations.&lt;/p&gt;
+&lt;p&gt;Plausible causes:&lt;/p&gt;
+&lt;ul class="simple"&gt;
+&lt;li&gt;increased loads on the network (ie. everyone comes home and surfs)&lt;/li&gt;
+&lt;li&gt;error in my aurduino sketch&lt;/li&gt;
+&lt;li&gt;Giant Rat chewing on telecom cable&lt;/li&gt;
+&lt;/ul&gt;
+&lt;pre class="code python ipynb-cell literal-block"&gt;
+&lt;span class="n"&gt;fig&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;ax&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;plt&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;subplots&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;ax&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;set_xlabel&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;'Date/Time'&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;ax&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;set_ylabel&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;'Round Trip Ping (ms)'&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;df_timeouts&lt;/span&gt;&lt;span class="p"&gt;[::&lt;/span&gt;&lt;span class="mi"&gt;100&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;plot&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;x&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="s1"&gt;'timestamp'&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;y&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="s1"&gt;'ping'&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;ax&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="n"&gt;ax&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;legend&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="bp"&gt;False&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;color&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="s1"&gt;'Pink'&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;df_clean&lt;/span&gt;&lt;span class="p"&gt;[::&lt;/span&gt;&lt;span class="mi"&gt;100&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;plot&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;x&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="s1"&gt;'timestamp'&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;y&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="s1"&gt;'ping'&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;ax&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="n"&gt;ax&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;legend&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="bp"&gt;False&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;color&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="s1"&gt;'DarkGreen'&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;/pre&gt;
+&lt;img alt="" src="/legacy/2014-12-24-Time-Warner-Cable/ping-test_9_1.png" /&gt;
+&lt;pre class="code python ipynb-cell literal-block"&gt;
+&lt;span class="n"&gt;number_of_timeouts&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;timeout_indices&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;sum&lt;/span&gt;&lt;span class="p"&gt;()&lt;/span&gt;
+
+&lt;span class="n"&gt;timeout_percentage&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;number_of_timeouts&lt;/span&gt; &lt;span class="o"&gt;/&lt;/span&gt; &lt;span class="nb"&gt;len&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;df_raw&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+
+&lt;span class="k"&gt;print&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;'{0} out of {1} requests timed out. '&lt;/span&gt;
+      &lt;span class="s1"&gt;'{2:.2%} of all requests timed out.'&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;format&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;number_of_timeouts&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
+                                                  &lt;span class="nb"&gt;len&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;df_raw&lt;/span&gt;&lt;span class="p"&gt;),&lt;/span&gt;
+                                                  &lt;span class="n"&gt;timeout_percentage&lt;/span&gt;&lt;span class="p"&gt;))&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="ipynb-literal literal-block"&gt;
+99525 out of 809771 requests timed out. 12.29% of all requests timed out.
+&lt;/pre&gt;
+&lt;pre class="code python ipynb-cell literal-block"&gt;
+&lt;span class="n"&gt;pings&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;df_clean&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;ping&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="o"&gt;~&lt;/span&gt;&lt;span class="n"&gt;timeout_indices&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="code python ipynb-cell literal-block"&gt;
+&lt;span class="n"&gt;fig&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;ax&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;plt&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;subplots&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;ax&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;set_xlabel&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;'Ping (ms)'&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;ax&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;set_ylabel&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;'Number of requests for given ping duration'&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;pings&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;hist&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;bins&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="mi"&gt;1000&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;ax&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="n"&gt;ax&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="ipynb-literal literal-block"&gt;
+&amp;lt;matplotlib.axes._subplots.AxesSubplot at 0x12ba0aef0&amp;gt;
+&lt;/pre&gt;
+&lt;img alt="" src="/legacy/2014-12-24-Time-Warner-Cable/ping-test_12_1.png" /&gt;
+&lt;pre class="code python ipynb-cell literal-block"&gt;
+&lt;span class="k"&gt;print&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;'{:.2%} of pings were over 100 ms.'&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;format&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nb"&gt;len&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;pings&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="n"&gt;pings&lt;/span&gt; &lt;span class="o"&gt;&amp;gt;&lt;/span&gt; &lt;span class="mi"&gt;100&lt;/span&gt;&lt;span class="p"&gt;])&lt;/span&gt; &lt;span class="o"&gt;/&lt;/span&gt; &lt;span class="nb"&gt;len&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;pings&lt;/span&gt;&lt;span class="p"&gt;)))&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="ipynb-literal literal-block"&gt;
+1.27% of pings were over 100 ms.
+&lt;/pre&gt;
+&lt;pre class="code python ipynb-cell literal-block"&gt;
+&lt;span class="k"&gt;print&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;'The average ping was {:.0f} ms.'&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;format&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;pings&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;mean&lt;/span&gt;&lt;span class="p"&gt;()))&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="ipynb-literal literal-block"&gt;
+The average ping was 35 ms.
+&lt;/pre&gt;
+&lt;pre class="code python ipynb-cell literal-block"&gt;
+&lt;span class="n"&gt;ok_pings&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;pings&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="n"&gt;pings&lt;/span&gt; &lt;span class="o"&gt;&amp;lt;=&lt;/span&gt; &lt;span class="mi"&gt;100&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt;
+&lt;span class="k"&gt;print&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;'From the set of pings that were less than 100 ms, '&lt;/span&gt;
+      &lt;span class="s1"&gt;'the average ping was {:.0f} ms.'&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;format&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;ok_pings&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;mean&lt;/span&gt;&lt;span class="p"&gt;()))&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="ipynb-literal literal-block"&gt;
+From the set of pings that were less than 100 ms, the average ping was 32 ms.
+&lt;/pre&gt;
+&lt;pre class="code python ipynb-cell literal-block"&gt;
+&lt;span class="n"&gt;fig&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;ax&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;plt&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;subplots&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;ax&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;set_xlabel&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;'Ping (ms)'&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;ax&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;set_ylabel&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;'Number of requests for given ping duration'&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="n"&gt;ok_pings&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;hist&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;bins&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="mi"&gt;100&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;ax&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="n"&gt;ax&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;/pre&gt;
+&lt;pre class="ipynb-literal literal-block"&gt;
+&amp;lt;matplotlib.axes._subplots.AxesSubplot at 0x117cd96a0&amp;gt;
+&lt;/pre&gt;
+&lt;img alt="" src="/legacy/2014-12-24-Time-Warner-Cable/ping-test_16_1.png" /&gt;
+&lt;p&gt;Interestingly, there seem to be ping durations that are not
+represented by any successful requests. For example, there were no
+successful pings with a duration of 20 milliseconds. That just seems
+wrong. Not sure how much I can trust
+this data. I will rerun the experiment and report back.&lt;/p&gt;
+&lt;p&gt;To be continued...&lt;/p&gt;
+&lt;/div&gt;
+</summary></entry><entry><title>Setting up a Vagrant development environment on OSX</title><link href="http://plog.logston.me/setting-up-a-vagrant-development-environment-on-osx.html" rel="alternate"></link><updated>2014-12-06T13:28:04+00:00</updated><author><name>Paul Logston</name></author><id>tag:plog.logston.me,2014-12-06:setting-up-a-vagrant-development-environment-on-osx.html</id><summary type="html">&lt;div class="section" id="what-i-wanted"&gt;
+&lt;h2&gt;What I wanted&lt;/h2&gt;
+&lt;p&gt;I really like managing virtual machines with Vagrant. The tool is easy to use
+and a real pleasure to play around with. I also really like my Mac. Thus, a
+good chunk of my development environments are built using Vagrant on my Mac.
+This article shares one wall I ran into while developing with Vagrant on OSX and
+how I climbed over that wall.&lt;/p&gt;
+&lt;p&gt;My Goal:&lt;/p&gt;
+&lt;p&gt;I would like to serve my app from an environment that is as close to production
+(EC2 Linux box) as possible. However, I would like to edit my project's code
+with an IDE (PyCharm) installed on my host machine.&lt;/p&gt;
+&lt;p&gt;My Proposed Setup:&lt;/p&gt;
+&lt;p&gt;Share a directory on my Mac's local file system that contains all of the code
+for my project (ie. my project's repo) with the virtual machine (VM).&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="section" id="the-problem"&gt;
+&lt;h2&gt;The Problem&lt;/h2&gt;
+&lt;p&gt;When my Mac shares my project's repo directory with the VM, the VM doesn't
+preserve the cases of the letters within the names of the shared files[#]_. For
+example,&lt;/p&gt;
+&lt;blockquote&gt;
+/Users/paul/shared_dir/App.py&lt;/blockquote&gt;
+&lt;p&gt;would be seen as&lt;/p&gt;
+&lt;blockquote&gt;
+/vagrant/app.py&lt;/blockquote&gt;
+&lt;p&gt;on the VM, assuming that &lt;cite&gt;/vagrant&lt;/cite&gt; was mapped to &lt;cite&gt;/Users/paul/shared_dir&lt;/cite&gt;.&lt;/p&gt;
+&lt;p&gt;I first noticed this issue when a series of &lt;cite&gt;ImportError&lt;/cite&gt;s (python) began
+popping up
+while trying to run a management command associated with my Django project.
+I had a package named KISSmetrics installed (via pip)
+and I also had a file named kissmetrics.py (written by my team)
+in the projects repo.&lt;/p&gt;
+&lt;p&gt;The following line was located in the &lt;cite&gt;kissmetrics.py&lt;/cite&gt; file and would cause
+the management command to implode when run.&lt;/p&gt;
+&lt;blockquote&gt;
+from KISSmetrics import KM&lt;/blockquote&gt;
+&lt;p&gt;Now, I could have named &lt;cite&gt;kissmetrics.py&lt;/cite&gt; something like
+&lt;cite&gt;kissmetrics_utils.py&lt;/cite&gt; and solved the problem, but I was more interested in
+understanding why two files with different names (one capitalized and one not)
+were being interpreted as the same.&lt;/p&gt;
+&lt;p&gt;This issue especially puzzled me because I thought both
+Mac OSX (10.8 at the time) and Ubuntu (12.04) were,
+by default, case sensitive.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="section" id="investigation"&gt;
+&lt;h2&gt;Investigation&lt;/h2&gt;
+&lt;p&gt;After some &lt;a class="reference external" href="https://medium.com/&amp;#64;jasonsuave/a-more-useful-vagrant-38445d0d0736"&gt;investigation&lt;/a&gt;, I found out that the vagrant VM uses the same drive
+formatting rules that the host uses for the shared directory. Thus, if
+a directory &lt;cite&gt;/Users/paul/shared_dir&lt;/cite&gt; is located on a drive that is formatted as
+&amp;quot;Mac OS Extended (Journaled)&amp;quot; (ie. not case-sensitive) on the host machine,
+when that directory is shared with the VM as the directory &lt;cite&gt;/vagrant/&lt;/cite&gt;
+within the VM, the &lt;cite&gt;/vagrant/&lt;/cite&gt; directory will also not be case sensitive.
+And my host drive was formatted as &amp;quot;Mac OS Extended (Journaled)&amp;quot; rather than
+&amp;quot;Mac OS Extended (Case-sensitive, Journaled)&amp;quot;.&lt;/p&gt;
+&lt;p&gt;So, to jump back to my original issue for a second, when Python tried to import
+&lt;cite&gt;KISSmetrics&lt;/cite&gt; it raised an &lt;cite&gt;ImportError&lt;/cite&gt; because &lt;cite&gt;kissmetrics.py&lt;/cite&gt; had already
+been imported. Python asked the underlying OS/disk for &lt;cite&gt;KISSmetrics&lt;/cite&gt; and the
+OS/disk said &amp;quot;OK! Here you go&amp;quot; but handed back &lt;cite&gt;kissmetrics.py&lt;/cite&gt; cause the OS/disk
+knew no different. The disk didn't understand that it was being asked for a
+file with capital letters.&lt;/p&gt;
+&lt;p&gt;At this point I had a diagnosis. The cure for my issue seemed to be reformatting
+my host drive to be &amp;quot;Mac OS Extended (Case-sensitive, Journaled)&amp;quot;.
+I wasn't about to do that. Instead, I decided to put my project onto a new
+volume which I would format to be case-sensitive.&lt;/p&gt;
+&lt;p&gt;Below are details on how I created my case-sensitive drive.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="section" id="solution"&gt;
+&lt;h2&gt;Solution&lt;/h2&gt;
+&lt;div class="section" id="ready-your-mac"&gt;
+&lt;h3&gt;Ready Your Mac&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;p class="first"&gt;Install the following:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;ul class="simple"&gt;
+&lt;li&gt;&lt;a class="reference external" href="https://www.virtualbox.org/wiki/Downloads"&gt;Virtualbox&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class="reference external" href="https://www.vagrantup.com/downloads.html"&gt;Vagrant&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/blockquote&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/div&gt;
+&lt;div class="section" id="create-a-drive"&gt;
+&lt;h3&gt;Create a drive&lt;/h3&gt;
+&lt;p&gt;A case-sensitive drive needs to be created and shared with the vagrant VM.&lt;/p&gt;
+&lt;p&gt;From within Disk Utility, click &amp;quot;New Image&amp;quot; to create a new drive.&lt;/p&gt;
+&lt;p&gt;Create a drive with the following configuration:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;ul class="simple"&gt;
+&lt;li&gt;Size: Custom (8 GB)&lt;/li&gt;
+&lt;li&gt;Format: Mac OS Extended (Case-Sensitive, Journaled)&lt;/li&gt;
+&lt;li&gt;Save as: &amp;lt;anything you want&amp;gt;.sparsebundle*&lt;/li&gt;
+&lt;li&gt;Name: &amp;lt;anything you want&amp;gt;*&lt;/li&gt;
+&lt;li&gt;Partitions: Single partition - GUID Partition Map&lt;/li&gt;
+&lt;li&gt;Encryption: None&lt;/li&gt;
+&lt;li&gt;Image Format: sparse bundle disk image&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The value you give for &amp;quot;Save as&amp;quot; (ie. &lt;cite&gt;&amp;lt;whatever you choose&amp;gt;.sparsebundle&lt;/cite&gt;)
+will be the name of the sparse bundle on your Mac's local file system.
+The value you give for &amp;quot;Name&amp;quot; will be the name of the mounted drive
+when you mount the sparse bundle. For example, a mounted drive with a name of
+&amp;quot;pauls_drive&amp;quot; will be located at &lt;cite&gt;/Volumes/pauls_drive&lt;/cite&gt;.&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;ul class="simple"&gt;
+&lt;li&gt;Why Case-Sensitive - &lt;a class="reference external" href="https://medium.com/&amp;#64;jasonsuave/a-more-useful-vagrant-38445d0d0736"&gt;https://medium.com/&amp;#64;jasonsuave/a-more-useful-vagrant-38445d0d0736&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Why Sparse Bundle - &lt;a class="reference external" href="https://discussions.apple.com/thread/2001162?tstart=0"&gt;https://discussions.apple.com/thread/2001162?tstart=0&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Why GUID partition - &lt;a class="reference external" href="https://developer.apple.com/library/mac/technotes/tn2166/_index.html"&gt;https://developer.apple.com/library/mac/technotes/tn2166/_index.html&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Why Journaling - &lt;a class="reference external" href="http://support.apple.com/en-us/HT2355"&gt;http://support.apple.com/en-us/HT2355&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;&lt;img alt="disk-utils" src="/legacy/2014-12-06-Vagrant-development-environment-on-OSX/disk_utils.png" /&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+</summary></entry><entry><title>15Five Birthdays</title><link href="http://plog.logston.me/15five-birthdays.html" rel="alternate"></link><updated>2014-11-25T13:28:04+00:00</updated><author><name>Paul Logston</name></author><id>tag:plog.logston.me,2014-11-25:15five-birthdays.html</id><summary type="html">&lt;p&gt;I work at &lt;a class="reference external" href="http://www.15Five.com"&gt;15Five&lt;/a&gt;. One of the things 15Five strives
+for is an environment in which its team members can grow. 15Five puts money
+where is mouth is and gives each employee a birthday bonus; cash to fund
+growth as an individual. We can spend the birthday bonus however we like (gym,
+skydiving, meditation excursion, microscopes) with one stipulation: we have to
+report back to the team and share how we grew.&lt;/p&gt;
+&lt;p&gt;I have wanted a compound microscope for some time and could never justify the
+cost. And I never thought 'gotta do it for work' was going to be how I justified
+such a purchase.&lt;/p&gt;
+&lt;p&gt;With my birthday bonus I purchased a
+&lt;a class="reference external" href="http://www.amazon.com/gp/product/B004QEFO1Q"&gt;AmScope T490B&lt;/a&gt;
+from amazon along with all
+the necessary addons (sans my camera) to take photos of specimens under
+observation.&lt;/p&gt;
+&lt;img alt="My desk &amp;amp; T490B" src="/legacy/2014-11-25-15Five-Birthdays/desk.jpg" /&gt;
+&lt;p&gt;The microscope is fantastic and with my camera attached I can take and share
+some really sweet photos.&lt;/p&gt;
+&lt;img alt="Cheese Fungus - Colby Jack" src="/legacy/2014-11-25-15Five-Birthdays/IMG_0626.jpg" /&gt;
+&lt;img alt="3 Line - Just past fulton stop on car 1614. After walking through doors 11 &amp;amp; 12, 330 degree sweep. August 29th, 2014 &amp;#64; 10:45pm, first vertical middle pole on left. About 4-6 feet from floor." src="/legacy/2014-11-25-15Five-Birthdays/IMG_0640.jpg" /&gt;
+&lt;img alt="3 Line - Just past fulton stop on car 1614. After walking through doors 11 &amp;amp; 12, 330 degree sweep. August 29th, 2014 &amp;#64; 10:45pm, first vertical middle pole on left. About 4-6 feet from floor." src="/legacy/2014-11-25-15Five-Birthdays/IMG_0641.jpg" /&gt;
+&lt;img alt="3 Line - Just past fulton stop on car 1614. After walking through doors 11 &amp;amp; 12, 330 degree sweep. August 29th, 2014 &amp;#64; 10:45pm, first vertical middle pole on left. About 4-6 feet from floor." src="/legacy/2014-11-25-15Five-Birthdays/IMG_0642.jpg" /&gt;
+&lt;img alt="3 Line - Just past fulton stop on car 1614. After walking through doors 11 &amp;amp; 12, 330 degree sweep. August 29th, 2014 &amp;#64; 10:45pm, first vertical middle pole on left. About 4-6 feet from floor." src="/legacy/2014-11-25-15Five-Birthdays/IMG_0646.jpg" /&gt;
+&lt;img alt="Flow 1" src="/legacy/2014-11-25-15Five-Birthdays/IMG_0717.jpg" /&gt;
+&lt;img alt="Flow 2" src="/legacy/2014-11-25-15Five-Birthdays/IMG_0721.jpg" /&gt;
+&lt;img alt="Flow 3" src="/legacy/2014-11-25-15Five-Birthdays/IMG_0732.jpg" /&gt;
+</summary></entry></feed>

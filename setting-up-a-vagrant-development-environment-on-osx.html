@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width initial-scale=1">
+
+  <title>plog &middot; Setting up a Vagrant development environment on OSX</title>
+
+  <link rel="stylesheet" href="/theme/css/main.css">
+  <link rel="stylesheet" type="text/css" href="/theme/css/pygments.css">
+
+
+
+</head>
+
+<body>
+
+  <header class="site-header">
+    <div class="wrapper">
+      <a class="site-title" href="http://plog.logston.me">plog</a>
+
+      <nav class="site-nav">
+        <a href="#" class="menu-icon">
+          <svg viewBox="0 0 18 15">
+            <path fill="#424242" d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z"/>
+            <path fill="#424242" d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z"/>
+            <path fill="#424242" d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z"/>
+          </svg>
+        </a>
+
+        <div class="trigger">
+              <a class="page-link" href="http://plog.logston.me/pages/about.html">
+                About
+              </a>
+        </div>
+      </nav>
+    </div>
+  </header>
+
+  <div class="page-content">
+    <div class="wrapper">
+  <div class="post">
+
+    <header class="post-header">
+      <h1 class="post-title">Setting up a Vagrant development environment on OSX</h1>
+    </header>
+
+    <footer class="post-info">
+      <time class="published" datetime="2014-12-06T13:28:04+00:00">
+        Sat 06 December 2014
+      </time>
+    </footer><!-- /.post-info -->
+
+    <article class="post-content">
+      <div class="section" id="what-i-wanted">
+<h2>What I wanted</h2>
+<p>I really like managing virtual machines with Vagrant. The tool is easy to use
+and a real pleasure to play around with. I also really like my Mac. Thus, a
+good chunk of my development environments are built using Vagrant on my Mac.
+This article shares one wall I ran into while developing with Vagrant on OSX and
+how I climbed over that wall.</p>
+<p>My Goal:</p>
+<p>I would like to serve my app from an environment that is as close to production
+(EC2 Linux box) as possible. However, I would like to edit my project's code
+with an IDE (PyCharm) installed on my host machine.</p>
+<p>My Proposed Setup:</p>
+<p>Share a directory on my Mac's local file system that contains all of the code
+for my project (ie. my project's repo) with the virtual machine (VM).</p>
+</div>
+<div class="section" id="the-problem">
+<h2>The Problem</h2>
+<p>When my Mac shares my project's repo directory with the VM, the VM doesn't
+preserve the cases of the letters within the names of the shared files[#]_. For
+example,</p>
+<blockquote>
+/Users/paul/shared_dir/App.py</blockquote>
+<p>would be seen as</p>
+<blockquote>
+/vagrant/app.py</blockquote>
+<p>on the VM, assuming that <cite>/vagrant</cite> was mapped to <cite>/Users/paul/shared_dir</cite>.</p>
+<p>I first noticed this issue when a series of <cite>ImportError</cite>s (python) began
+popping up
+while trying to run a management command associated with my Django project.
+I had a package named KISSmetrics installed (via pip)
+and I also had a file named kissmetrics.py (written by my team)
+in the projects repo.</p>
+<p>The following line was located in the <cite>kissmetrics.py</cite> file and would cause
+the management command to implode when run.</p>
+<blockquote>
+from KISSmetrics import KM</blockquote>
+<p>Now, I could have named <cite>kissmetrics.py</cite> something like
+<cite>kissmetrics_utils.py</cite> and solved the problem, but I was more interested in
+understanding why two files with different names (one capitalized and one not)
+were being interpreted as the same.</p>
+<p>This issue especially puzzled me because I thought both
+Mac OSX (10.8 at the time) and Ubuntu (12.04) were,
+by default, case sensitive.</p>
+</div>
+<div class="section" id="investigation">
+<h2>Investigation</h2>
+<p>After some <a class="reference external" href="https://medium.com/&#64;jasonsuave/a-more-useful-vagrant-38445d0d0736">investigation</a>, I found out that the vagrant VM uses the same drive
+formatting rules that the host uses for the shared directory. Thus, if
+a directory <cite>/Users/paul/shared_dir</cite> is located on a drive that is formatted as
+&quot;Mac OS Extended (Journaled)&quot; (ie. not case-sensitive) on the host machine,
+when that directory is shared with the VM as the directory <cite>/vagrant/</cite>
+within the VM, the <cite>/vagrant/</cite> directory will also not be case sensitive.
+And my host drive was formatted as &quot;Mac OS Extended (Journaled)&quot; rather than
+&quot;Mac OS Extended (Case-sensitive, Journaled)&quot;.</p>
+<p>So, to jump back to my original issue for a second, when Python tried to import
+<cite>KISSmetrics</cite> it raised an <cite>ImportError</cite> because <cite>kissmetrics.py</cite> had already
+been imported. Python asked the underlying OS/disk for <cite>KISSmetrics</cite> and the
+OS/disk said &quot;OK! Here you go&quot; but handed back <cite>kissmetrics.py</cite> cause the OS/disk
+knew no different. The disk didn't understand that it was being asked for a
+file with capital letters.</p>
+<p>At this point I had a diagnosis. The cure for my issue seemed to be reformatting
+my host drive to be &quot;Mac OS Extended (Case-sensitive, Journaled)&quot;.
+I wasn't about to do that. Instead, I decided to put my project onto a new
+volume which I would format to be case-sensitive.</p>
+<p>Below are details on how I created my case-sensitive drive.</p>
+</div>
+<div class="section" id="solution">
+<h2>Solution</h2>
+<div class="section" id="ready-your-mac">
+<h3>Ready Your Mac</h3>
+<ul>
+<li><p class="first">Install the following:</p>
+<blockquote>
+<ul class="simple">
+<li><a class="reference external" href="https://www.virtualbox.org/wiki/Downloads">Virtualbox</a></li>
+<li><a class="reference external" href="https://www.vagrantup.com/downloads.html">Vagrant</a></li>
+</ul>
+</blockquote>
+</li>
+</ul>
+</div>
+<div class="section" id="create-a-drive">
+<h3>Create a drive</h3>
+<p>A case-sensitive drive needs to be created and shared with the vagrant VM.</p>
+<p>From within Disk Utility, click &quot;New Image&quot; to create a new drive.</p>
+<p>Create a drive with the following configuration:</p>
+<blockquote>
+<ul class="simple">
+<li>Size: Custom (8 GB)</li>
+<li>Format: Mac OS Extended (Case-Sensitive, Journaled)</li>
+<li>Save as: &lt;anything you want&gt;.sparsebundle*</li>
+<li>Name: &lt;anything you want&gt;*</li>
+<li>Partitions: Single partition - GUID Partition Map</li>
+<li>Encryption: None</li>
+<li>Image Format: sparse bundle disk image</li>
+</ul>
+</blockquote>
+<p>The value you give for &quot;Save as&quot; (ie. <cite>&lt;whatever you choose&gt;.sparsebundle</cite>)
+will be the name of the sparse bundle on your Mac's local file system.
+The value you give for &quot;Name&quot; will be the name of the mounted drive
+when you mount the sparse bundle. For example, a mounted drive with a name of
+&quot;pauls_drive&quot; will be located at <cite>/Volumes/pauls_drive</cite>.</p>
+<blockquote>
+<ul class="simple">
+<li>Why Case-Sensitive - <a class="reference external" href="https://medium.com/&#64;jasonsuave/a-more-useful-vagrant-38445d0d0736">https://medium.com/&#64;jasonsuave/a-more-useful-vagrant-38445d0d0736</a></li>
+<li>Why Sparse Bundle - <a class="reference external" href="https://discussions.apple.com/thread/2001162?tstart=0">https://discussions.apple.com/thread/2001162?tstart=0</a></li>
+<li>Why GUID partition - <a class="reference external" href="https://developer.apple.com/library/mac/technotes/tn2166/_index.html">https://developer.apple.com/library/mac/technotes/tn2166/_index.html</a></li>
+<li>Why Journaling - <a class="reference external" href="http://support.apple.com/en-us/HT2355">http://support.apple.com/en-us/HT2355</a></li>
+</ul>
+</blockquote>
+<p><img alt="disk-utils" src="/legacy/2014-12-06-Vagrant-development-environment-on-OSX/disk_utils.png" /></p>
+</div>
+</div>
+
+    </article>
+
+  </div>
+
+    </div>
+  </div>
+
+<footer class="site-footer">
+
+  <div class="wrapper">
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col  footer-col-1">
+        <ul class="contact-list">
+          <li>plog &nbsp;|&nbsp; by Paul Logston</li>
+          <li><a href="mailto:"></a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col  footer-col-2">
+        <ul class="social-media-list">
+          <li>
+            <a href="https://github.com/logston">
+              <span class="icon  icon--github">
+                <svg viewBox="0 0 16 16">
+                  <path fill="#828282" d="M7.999,0.431c-4.285,0-7.76,3.474-7.76,7.761 c0,3.428,2.223,6.337,5.307,7.363c0.388,0.071,0.53-0.168,0.53-0.374c0-0.184-0.007-0.672-0.01-1.32 c-2.159,0.469-2.614-1.04-2.614-1.04c-0.353-0.896-0.862-1.135-0.862-1.135c-0.705-0.481,0.053-0.472,0.053-0.472 c0.779,0.055,1.189,0.8,1.189,0.8c0.692,1.186,1.816,0.843,2.258,0.645c0.071-0.502,0.271-0.843,0.493-1.037 C4.86,11.425,3.049,10.76,3.049,7.786c0-0.847,0.302-1.54,0.799-2.082C3.768,5.507,3.501,4.718,3.924,3.65 c0,0,0.652-0.209,2.134,0.796C6.677,4.273,7.34,4.187,8,4.184c0.659,0.003,1.323,0.089,1.943,0.261 c1.482-1.004,2.132-0.796,2.132-0.796c0.423,1.068,0.157,1.857,0.077,2.054c0.497,0.542,0.798,1.235,0.798,2.082 c0,2.981-1.814,3.637-3.543,3.829c0.279,0.24,0.527,0.713,0.527,1.437c0,1.037-0.01,1.874-0.01,2.129 c0,0.208,0.14,0.449,0.534,0.373c3.081-1.028,5.302-3.935,5.302-7.362C15.76,3.906,12.285,0.431,7.999,0.431z"/>
+                </svg>
+              </span>
+
+              <span class="username">logston</span>
+            </a>
+          </li>
+
+          <li>
+              <a href="https://twitter.com/paullogston">
+              <span class="icon  icon--twitter">
+                <svg viewBox="0 0 16 16">
+                  <path fill="#828282" d="M15.969,3.058c-0.586,0.26-1.217,0.436-1.878,0.515c0.675-0.405,1.194-1.045,1.438-1.809
+                  c-0.632,0.375-1.332,0.647-2.076,0.793c-0.596-0.636-1.446-1.033-2.387-1.033c-1.806,0-3.27,1.464-3.27,3.27 c0,0.256,0.029,0.506,0.085,0.745C5.163,5.404,2.753,4.102,1.14,2.124C0.859,2.607,0.698,3.168,0.698,3.767 c0,1.134,0.577,2.135,1.455,2.722C1.616,6.472,1.112,6.325,0.671,6.08c0,0.014,0,0.027,0,0.041c0,1.584,1.127,2.906,2.623,3.206 C3.02,9.402,2.731,9.442,2.433,9.442c-0.211,0-0.416-0.021-0.615-0.059c0.416,1.299,1.624,2.245,3.055,2.271 c-1.119,0.877-2.529,1.4-4.061,1.4c-0.264,0-0.524-0.015-0.78-0.046c1.447,0.928,3.166,1.469,5.013,1.469 c6.015,0,9.304-4.983,9.304-9.304c0-0.142-0.003-0.283-0.009-0.423C14.976,4.29,15.531,3.714,15.969,3.058z"/>
+                </svg>
+              </span>
+
+              <span class="username">paullogston</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <div class="footer-col  footer-col-3">
+          <p class="text">Code, biology, etc. Hope you enjoy :)</p>
+      </div>
+    </div>
+
+  </div>
+
+</footer>
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-371458-10', 'auto');
+  ga('require', 'displayfeatures');
+  ga('send', 'pageview');
+
+</script>
+
+</body>
+</html>
